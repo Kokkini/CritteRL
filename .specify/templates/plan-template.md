@@ -83,6 +83,23 @@ frontend/
 │   └── services/
 └── tests/
 
+# [REMOVE IF UNUSED] Option 2b: Static web front-end only (no backend)
+src/
+├── components/
+├── pages/
+├── services/
+├── MimicRL/          # RL library
+├── physics/      # Physics engine integration
+└── utils/
+
+public/ or assets/
+└── [static assets: images, models, etc.]
+
+tests/
+├── unit/
+├── integration/
+└── e2e/
+
 # [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
 api/
 └── [same as backend above]

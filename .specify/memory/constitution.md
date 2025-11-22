@@ -1,50 +1,78 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report:
+Version change: 1.0.0 → 1.1.0
+Modified principles: N/A
+Added sections: N/A
+Removed sections: N/A
+Technology requirement added: TypeScript (MINOR version bump)
+Templates requiring updates:
+  ✅ .specify/templates/plan-template.md (no changes needed - already supports language specification)
+  ✅ .specify/templates/spec-template.md (no changes needed)
+  ✅ .specify/templates/tasks-template.md (no changes needed)
+Follow-up TODOs: None
+-->
+
+# CritteRL Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Static Web Front-End Only (NON-NEGOTIABLE)
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+The application MUST be a static web front-end with no backend server. All functionality MUST execute entirely in the browser. No server-side APIs, databases, or server processes are permitted. The application MUST be deployable as static files (HTML, CSS, JavaScript) to any static hosting service (GitHub Pages, Netlify, Vercel, CDN, etc.). All data persistence MUST use browser storage mechanisms (localStorage, IndexedDB) if needed. All computation, including RL training, MUST run client-side in the browser.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+**Rationale**: Enables zero-cost deployment, eliminates server maintenance, ensures offline capability, and simplifies distribution. RL training will use browser-based frameworks (e.g., TensorFlow.js, WebAssembly) to run neural network computations client-side.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+## Architecture Constraints
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### Technology Stack
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+- **Language**: TypeScript (MUST be used for all source code)
+- **Front-End Framework**: Modern JavaScript framework (React, Vue, Svelte, or vanilla JS) - written in TypeScript
+- **RL Framework**: MimicRL (already in src/MimicRL)
+- **Physics Engine**: JavaScript or WebAssembly physics library (Matter.js, Box2D.js, or custom) - TypeScript bindings/definitions required
+- **Build Tools**: Static site generator or bundler (Vite, Webpack, Parcel) with TypeScript support
+- **Deployment**: Static file hosting on GitHub Pages
+- **Storage**: Browser APIs only (localStorage, IndexedDB, SessionStorage)
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### Prohibited Technologies
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+- Backend servers (Node.js servers, Python Flask/Django, etc.)
+- Server-side databases (PostgreSQL, MongoDB, etc.)
+- External APIs for computation or training
+- Server-side rendering (SSR) - static generation only
+- Serverless functions that process data (API routes, Lambda functions)
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### Performance Standards
+
+- Initial page load: < 3 seconds on 3G connection
+- RL training: Must not freeze UI (use Web Workers if needed)
+- Physics simulation: Maintain 60fps for smooth visualization
+- Memory usage: Optimize to prevent browser crashes on lower-end devices
+
+## Development Workflow
+
+### Code Organization
+
+- **Source Structure**: `src/` directory with modular components
+- **Static Assets**: `public/` or `assets/` for images, models, etc.
+- **Tests**: `tests/` directory with browser-compatible test files
+- **Build Output**: `dist/` or `build/` directory for static files
+
+### Development Process
+
+1. **Local Development**: Run development server (e.g., `vite dev`, `npm start`)
+2. **Testing**: Run browser-based tests before committing
+3. **Build**: Generate static files for deployment
+4. **Deploy**: Push static files to hosting service
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other development practices. Amendments require:
+1. Documentation of the change rationale
+2. Update to this constitution file with version bump
+3. Verification that all templates and related documents are updated
+4. Review of impact on existing code and architecture
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+All pull requests and code reviews MUST verify compliance with these principles. Any violation of the static web front-end only principle MUST be explicitly justified and approved before implementation. Complexity additions (e.g., WebAssembly modules) MUST be justified against simpler alternatives.
+
+**Version**: 1.1.0 | **Ratified**: 2025-01-27 | **Last Amended**: 2025-01-27

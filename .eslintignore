@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+dist/
+build/
+coverage/
+
+# Build outputs
+*.min.js
+*.bundle.js
+
+# Generated files
+*.d.ts.map
+
+# Config files
+*.config.js
+vite.config.ts
+
+# Public assets
+public/
+
+# Test outputs
+.nyc_output/
+
+# Cache
+.cache/
+.eslintcache
+

@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+dist/
+build/
+coverage/
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build outputs
+*.min.js
+*.bundle.js
+
+# Generated files
+*.d.ts.map
+
+# Public assets
+public/
+
+# Cache
+.cache/
+.prettiercache
+
+# Logs
+*.log
+
