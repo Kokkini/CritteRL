@@ -1,23 +1,19 @@
 /**
- * TrainingControls - Training control buttons (start, pause, resume, stop)
+ * TrainingControls - Training control buttons (start, save brain)
  */
 
 interface TrainingControlsProps {
   isRunning: boolean;
-  isPaused: boolean;
   onStart: () => void;
-  onPause: () => void;
-  onResume: () => void;
-  onStop: () => void;
+  onSaveBrain?: () => void;
+  canSaveBrain?: boolean;
 }
 
 export default function TrainingControls({
   isRunning,
-  isPaused,
   onStart,
-  onPause,
-  onResume,
-  onStop,
+  onSaveBrain,
+  canSaveBrain = false,
 }: TrainingControlsProps) {
   return (
     <div style={{ marginBottom: '20px' }}>
@@ -26,25 +22,13 @@ export default function TrainingControls({
           Start Training
         </button>
       )}
-      {isRunning && !isPaused && (
-        <>
-          <button onClick={onPause} style={{ padding: '10px 20px', marginRight: '10px' }}>
-            Pause
-          </button>
-          <button onClick={onStop} style={{ padding: '10px 20px' }}>
-            Stop
-          </button>
-        </>
-      )}
-      {isRunning && isPaused && (
-        <>
-          <button onClick={onResume} style={{ padding: '10px 20px', marginRight: '10px' }}>
-            Resume
-          </button>
-          <button onClick={onStop} style={{ padding: '10px 20px' }}>
-            Stop
-          </button>
-        </>
+      {isRunning && canSaveBrain && onSaveBrain && (
+        <button 
+          onClick={onSaveBrain} 
+          style={{ padding: '10px 20px', marginRight: '10px', backgroundColor: '#4a9eff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+        >
+          Save Brain
+        </button>
       )}
     </div>
   );

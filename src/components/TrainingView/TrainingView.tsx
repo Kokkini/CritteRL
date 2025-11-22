@@ -3,12 +3,11 @@
  */
 
 import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { TrainingService } from '../../services/TrainingService';
 import { StorageService } from '../../services/StorageService';
 import { TaskService } from '../../services/TaskService';
 import { CreatureService } from '../../services/CreatureService';
-import { TrainingMetrics, TrainingProgress, CreatureDesign } from '../../utils/types';
+import { TrainingMetrics, TrainingProgress, TrainedModel } from '../../utils/types';
 import { CanvasRenderer } from '../../rendering/CanvasRenderer';
 import { CreatureRenderer } from '../../rendering/CreatureRenderer';
 import { EnvironmentRenderer } from '../../rendering/EnvironmentRenderer';
@@ -19,9 +18,9 @@ import { CreatureGameCore } from '../../game/CreatureGameCore';
 import { PhysicsWorld } from '../../game/PhysicsWorld';
 import { CreaturePhysics } from '../../physics/CreaturePhysics';
 import { PolicyController } from '../../MimicRL/controllers/PolicyController';
-import TrainingMetricsDisplay from './TrainingMetrics';
 import TrainingControls from './TrainingControls';
 import { TrainingVisualizer } from '../../MimicRL/visualization/TrainingVisualizer.js';
+import ModelSelector from '../TaskView/ModelSelector';
 
 export interface TrainingViewProps {
   creatureDesignId: string;
@@ -32,20 +31,18 @@ export interface TrainingViewProps {
 
 export interface TrainingViewRef {
   start(): void;
-  pause(): void;
-  resume(): void;
-  stop(): void;
   getMetrics(): TrainingMetrics | null;
 }
 
 const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
-  ({ creatureDesignId, taskId, onTrainingComplete, onTrainingPaused }, ref) => {
-    const navigate = useNavigate();
+  ({ creatureDesignId, taskId }, ref) => {
     const [isRunning, setIsRunning] = useState(false);
-    const [isPaused, setIsPaused] = useState(false);
     const [metrics, setMetrics] = useState<TrainingMetrics | null>(null);
     const [progress, setProgress] = useState<TrainingProgress | null>(null);
     const [sessionId, setSessionId] = useState<string | null>(null);
+    const [canSaveBrain, setCanSaveBrain] = useState<boolean>(false);
+    const [selectedModel, setSelectedModel] = useState<TrainedModel | null>(null);
+    const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const cumulativeRewardRef = useRef<number>(0);
 
     const trainingServiceRef = useRef<TrainingService | null>(null);
@@ -65,7 +62,6 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
     const currentActionRef = useRef<number[]>([]); // Store current action to reuse
     const timeTillActionRef = useRef<number>(0); // Track remaining time for current action
     const isRunningRef = useRef<boolean>(false);
-    const isPausedRef = useRef<boolean>(false);
     const trainingVisualizerRef = useRef<any>(null);
     const visualizerContainerRef = useRef<HTMLDivElement>(null);
     
@@ -73,18 +69,18 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
     useEffect(() => {
       isRunningRef.current = isRunning;
     }, [isRunning]);
-    
-    useEffect(() => {
-      isPausedRef.current = isPaused;
-    }, [isPaused]);
 
     useEffect(() => {
       const init = async () => {
-        const storage = new StorageService();
-        await storage.initialize();
-        const taskService = new TaskService();
-        const creatureService = new CreatureService(storage);
-        trainingServiceRef.current = new TrainingService(storage, taskService, creatureService);
+        try {
+          console.log('[TrainingView] Initializing services...');
+          const storage = new StorageService();
+          await storage.initialize();
+          const taskService = new TaskService();
+          const creatureService = new CreatureService(storage);
+          trainingServiceRef.current = new TrainingService(storage, taskService, creatureService);
+          console.log('[TrainingView] Services initialized');
+          setIsInitialized(true);
 
         // Initialize rendering
         if (canvasRef.current) {
@@ -187,6 +183,10 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
             window.removeEventListener('resize', handleResize);
           };
         }
+        } catch (error) {
+          console.error('[TrainingView] Failed to initialize:', error);
+          setIsInitialized(true); // Still set to true so UI doesn't hang
+        }
       };
       init();
 
@@ -226,9 +226,6 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
 
     useImperativeHandle(ref, () => ({
       start: () => handleStart(),
-      pause: () => handlePause(),
-      resume: () => handleResume(),
-      stop: () => handleStop(),
       getMetrics: () => metrics,
     }));
 
@@ -282,7 +279,17 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
         );
         setSessionId(session.id);
         setIsRunning(true);
-        setIsPaused(false);
+
+        // If a model was selected, load it into the training session
+        if (selectedModel && selectedModel.id) {
+          try {
+            await trainingServiceRef.current.loadModelIntoSession(session.id, selectedModel.id);
+            console.log('Loaded model into training session:', selectedModel.name);
+          } catch (error) {
+            console.error('Failed to load model into session:', error);
+            alert('Failed to load selected model: ' + (error instanceof Error ? error.message : String(error)));
+          }
+        }
 
         // Create a separate visualization game core for rendering
         // This uses the trained agent to show current performance
@@ -310,6 +317,7 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
           const policyAgent = trainingServiceRef.current?.getPolicyAgent(session.id);
           if (policyAgent) {
             policyControllerRef.current = new PolicyController(policyAgent);
+            setCanSaveBrain(true);
           } else {
             // Retry after a short delay if agent not ready yet
             setTimeout(tryGetAgent, 200);
@@ -363,62 +371,31 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
       }
     };
 
-    const handlePause = async () => {
-      if (!trainingServiceRef.current || !sessionId) return;
 
-      try {
-        await trainingServiceRef.current.pauseTraining(sessionId);
-        setIsPaused(true);
-        // Visualization will continue but won't update (isPaused check in render loop)
-        if (onTrainingPaused && sessionId) {
-          // Would need to get session object
-        }
-      } catch (error) {
-        console.error('Failed to pause training:', error);
+    const handleSaveBrain = async () => {
+      if (!trainingServiceRef.current || !sessionId) {
+        alert('No active training session to save');
+        return;
       }
-    };
-
-    const handleResume = async () => {
-      if (!trainingServiceRef.current || !sessionId) return;
 
       try {
-        await trainingServiceRef.current.resumeTraining(sessionId);
-        setIsPaused(false);
-        // Update policy controller to latest agent
+        // Check if there's a trained model available
         const policyAgent = trainingServiceRef.current.getPolicyAgent(sessionId);
-        if (policyAgent && gameCoreRef.current) {
-          policyControllerRef.current = new PolicyController(policyAgent);
-          vizGameStateRef.current = gameCoreRef.current.reset();
-          lastVizUpdateRef.current = Date.now();
+        if (!policyAgent) {
+          alert('No trained model available yet. Please wait for training to progress.');
+          return;
         }
-        startUpdateLoop(sessionId);
-      } catch (error) {
-        console.error('Failed to resume training:', error);
-      }
-    };
 
-    const handleStop = async () => {
-      if (!trainingServiceRef.current || !sessionId) return;
+        // Save the trained model (the creature design is already saved separately in the editor)
+        const model = await trainingServiceRef.current.saveTrainedModel(
+          sessionId,
+          `Brain for ${creatureDesignId} - ${new Date().toLocaleString()}`
+        );
 
-      try {
-        await trainingServiceRef.current.stopTraining(sessionId);
-        setIsRunning(false);
-        setIsPaused(false);
-        if (renderingFrameRef.current) {
-          cancelAnimationFrame(renderingFrameRef.current);
-          renderingFrameRef.current = null;
-        }
-        if (updateFrameRef.current) {
-          cancelAnimationFrame(updateFrameRef.current);
-          updateFrameRef.current = null;
-        }
-        // Clean up visualizer
-        if (trainingVisualizerRef.current) {
-          trainingVisualizerRef.current.dispose();
-          trainingVisualizerRef.current = null;
-        }
+        alert(`Brain saved successfully!\nModel ID: ${model.id}\nEpisodes: ${model.episodes}`);
       } catch (error) {
-        console.error('Failed to stop training:', error);
+        console.error('Failed to save brain:', error);
+        alert('Failed to save brain: ' + (error instanceof Error ? error.message : String(error)));
       }
     };
 
@@ -436,7 +413,6 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
         
         // IMPORTANT: Access current state values via refs (not closure values)
         const currentlyRunning = isRunningRef.current;
-        const currentlyPaused = isPausedRef.current;
 
         const canvasRenderer = canvasRendererRef.current;
         const creatureRenderer = creatureRendererRef.current;
@@ -460,8 +436,7 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
 
         // Update visualization game with trained agent if available
         // Always step physics, even if agent isn't ready (so gravity works)
-        // Use current state values from closure (they should update, but let's be explicit)
-        const shouldStep = vizGameStateRef.current && currentlyRunning && !currentlyPaused;
+        const shouldStep = vizGameStateRef.current && currentlyRunning;
         
         if (shouldStep) {
           const now = Date.now();
@@ -624,6 +599,10 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
             }
           }
 
+          // Check if we can save brain (if there's a trained model)
+          const hasTrainedModel = trainingServiceRef.current.getPolicyAgent(sid) !== null;
+          setCanSaveBrain(hasTrainedModel);
+
           if (currentProgress.isRunning) {
             // Update every ~500ms (not every frame)
             setTimeout(() => {
@@ -644,13 +623,31 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
     return (
       <div style={{ padding: '20px' }}>
         <h2>Training Session</h2>
+        {!isRunning && isInitialized && trainingServiceRef.current && (
+          <div style={{ marginBottom: '20px' }}>
+            <ModelSelector
+              creatureDesignId={creatureDesignId}
+              selectedModel={selectedModel}
+              onModelSelect={setSelectedModel}
+              trainingService={trainingServiceRef.current}
+            />
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+              {selectedModel 
+                ? `Will continue training from: ${selectedModel.name} (${selectedModel.episodes} episodes)`
+                : 'No model selected - will start fresh training'}
+            </p>
+          </div>
+        )}
+        {!isRunning && !isInitialized && (
+          <div style={{ marginBottom: '20px', padding: '10px', border: '1px solid #ccc', borderRadius: '4px' }}>
+            <p>Initializing...</p>
+          </div>
+        )}
         <TrainingControls
           isRunning={isRunning}
-          isPaused={isPaused}
           onStart={handleStart}
-          onPause={handlePause}
-          onResume={handleResume}
-          onStop={handleStop}
+          onSaveBrain={handleSaveBrain}
+          canSaveBrain={canSaveBrain}
         />
         <div style={{ marginTop: '20px', marginBottom: '10px' }}>
           <p style={{ 
@@ -666,9 +663,8 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
           ref={canvasRef}
           style={{ border: '1px solid #ccc', marginTop: '10px', marginBottom: '20px', display: 'block' }}
         />
-        {metrics && <TrainingMetricsDisplay metrics={metrics} progress={progress} />}
         <div style={{ marginTop: '20px' }}>
-          <p>Status: {isRunning ? (isPaused ? 'Paused' : 'Running') : 'Stopped'}</p>
+          <p>Status: {isRunning ? 'Running' : 'Not Started'}</p>
           {progress && (
             <p>
               Episode: {progress.currentEpisode} /{' '}

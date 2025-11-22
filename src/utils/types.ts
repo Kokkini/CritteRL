@@ -194,6 +194,18 @@ export interface TrainedModel {
   valueWeights: Float32Array[];
   hyperparameters: TrainingHyperparameters;
   performanceMetrics: PerformanceMetrics;
+  // Optional: Full export bundle for easy loading (includes network architecture, etc.)
+  exportBundle?: {
+    version: string;
+    observationSize: number;
+    actionSize: number;
+    actionSpaces: unknown[];
+    networkArchitecture: unknown;
+    policyNetwork: unknown;
+    valueNetwork: unknown;
+    learnableStd: { data: number[]; shape: number[]; dtype: string };
+    metadata: unknown;
+  };
 }
 
 // Task result

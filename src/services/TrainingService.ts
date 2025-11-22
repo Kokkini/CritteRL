@@ -321,6 +321,9 @@ export class TrainingService {
       }
     }
 
+    // Export full bundle for easy loading (includes network architecture, etc.)
+    const exportBundle = active.mimicRLSession.exportAgentWeights();
+
     const model: TrainedModel = {
       id: nanoid(),
       creatureDesignId: active.session.creatureDesignId,
@@ -338,6 +341,7 @@ export class TrainingService {
         averageDistance: 0, // Would calculate from task-specific metrics
         bestDistance: 0, // Would calculate from task-specific metrics
       },
+      exportBundle, // Store full bundle for easy loading
     };
 
     // Save to IndexedDB
@@ -444,18 +448,46 @@ export class TrainingService {
    * List trained models for a creature
    */
   async listTrainedModels(creatureDesignId: string): Promise<TrainedModel[]> {
-    // This would require querying IndexedDB by creatureDesignId
-    // For now, we'll need to load all models and filter
-    // In a full implementation, we'd use an index on creatureDesignId
-    
-    // Get all keys from the trained_models store
-    const models: TrainedModel[] = [];
-    
-    // Simplified: In a real implementation, we'd iterate through all stored models
-    // For MVP, we'll return an empty array and let the UI handle it
-    // Full implementation would use IndexedDB getAll() or cursor iteration
-    
-    return models.filter((m) => m.creatureDesignId === creatureDesignId);
+    try {
+      console.log('[TrainingService] Listing models for creature:', creatureDesignId);
+      
+      // Ensure storage is initialized
+      if (!this.storageService) {
+        console.error('[TrainingService] StorageService not available');
+        return [];
+      }
+
+      // Get all models from IndexedDB
+      console.log('[TrainingService] Fetching all models from IndexedDB...');
+      const allModels = await this.storageService.getAllFromIndexedDB<TrainedModel>(
+        STORES.TRAINED_MODELS
+      );
+      console.log('[TrainingService] Found', allModels.length, 'total models in IndexedDB');
+      
+      // Filter by creatureDesignId, restore Date objects, and sort by trainedAt (most recent first)
+      const filteredModels = allModels
+        .filter((m) => {
+          const matches = m.creatureDesignId === creatureDesignId;
+          if (!matches && allModels.length > 0) {
+            console.log('[TrainingService] Model', m.id, 'belongs to creature', m.creatureDesignId, 'not', creatureDesignId);
+          }
+          return matches;
+        })
+        .map((m) => ({
+          ...m,
+          createdAt: m.createdAt instanceof Date ? m.createdAt : new Date(m.createdAt),
+          trainedAt: m.trainedAt instanceof Date ? m.trainedAt : new Date(m.trainedAt),
+        }))
+        .sort((a, b) => {
+          return b.trainedAt.getTime() - a.trainedAt.getTime(); // Most recent first
+        });
+      
+      console.log('[TrainingService] Filtered to', filteredModels.length, 'models for creature', creatureDesignId);
+      return filteredModels;
+    } catch (error) {
+      console.error('[TrainingService] Failed to list trained models:', error);
+      return [];
+    }
   }
 
   /**
@@ -485,6 +517,30 @@ export class TrainingService {
       return active.mimicRLSession;
     }
     return null;
+  }
+
+  /**
+   * Load a trained model into an active training session
+   */
+  async loadModelIntoSession(sessionId: string, modelId: string): Promise<void> {
+    const active = this.activeSessions.get(sessionId);
+    if (!active) {
+      throw new TrainingSessionNotFoundError(sessionId);
+    }
+
+    // Load the model
+    const model = await this.loadTrainedModel(modelId);
+    if (!model) {
+      throw new Error(`Model not found: ${modelId}`);
+    }
+
+    // Check if model has export bundle (new format)
+    if (model.exportBundle) {
+      await active.mimicRLSession.importAgentWeights(model.exportBundle);
+    } else {
+      // Fallback: Try to reconstruct from weights (this may not work perfectly)
+      throw new Error('Model does not have export bundle. Please save a new model.');
+    }
   }
 }
 

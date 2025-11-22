@@ -24,13 +24,20 @@ export default function ModelSelector({
 
   useEffect(() => {
     const loadModels = async () => {
-      if (!trainingService) return;
+      if (!trainingService) {
+        console.log('[ModelSelector] TrainingService not available yet');
+        setLoading(false);
+        return;
+      }
 
       try {
+        console.log('[ModelSelector] Loading models for creature:', creatureDesignId);
         const trainedModels = await trainingService.listTrainedModels(creatureDesignId);
+        console.log('[ModelSelector] Loaded models:', trainedModels.length);
         setModels(trainedModels);
       } catch (error) {
-        console.error('Failed to load models:', error);
+        console.error('[ModelSelector] Failed to load models:', error);
+        setModels([]);
       } finally {
         setLoading(false);
       }

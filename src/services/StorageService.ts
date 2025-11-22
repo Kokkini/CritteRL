@@ -193,6 +193,39 @@ export class StorageService {
   }
 
   /**
+   * Get all items from IndexedDB store
+   */
+  async getAllFromIndexedDB<T>(store: string): Promise<T[]> {
+    if (!this.db) {
+      console.log('[StorageService] Initializing database...');
+      await this.initialize();
+    }
+
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        console.error('[StorageService] Database not initialized after initialization attempt');
+        reject(new StorageUnavailableError('Database not initialized'));
+        return;
+      }
+
+      console.log('[StorageService] Getting all items from store:', store);
+      const transaction = this.db.transaction([store], 'readonly');
+      const objectStore = transaction.objectStore(store);
+      const request = objectStore.getAll();
+
+      request.onsuccess = () => {
+        const result = (request.result as T[]) || [];
+        console.log('[StorageService] Retrieved', result.length, 'items from store', store);
+        resolve(result);
+      };
+      request.onerror = () => {
+        console.error('[StorageService] Error getting all items:', request.error);
+        reject(new StorageUnavailableError('Failed to load all from IndexedDB'));
+      };
+    });
+  }
+
+  /**
    * Delete from IndexedDB
    */
   async deleteFromIndexedDB(store: string, id: string): Promise<void> {
