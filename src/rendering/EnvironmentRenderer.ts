@@ -23,7 +23,7 @@ export class EnvironmentRenderer {
     this.renderGrid(environment.width, environment.height, environment.groundLevel);
     // Then render other elements
     this.renderGround(environment.groundLevel, environment.width);
-    this.renderWalls(environment.groundLevel, environment.width, environment.height);
+    // Walls removed - not rendering walls
     this.renderTarget(target, 0.5); // 0.5 meter radius
     this.renderBoundaries(environment.width, environment.height);
   }
@@ -78,6 +78,56 @@ export class EnvironmentRenderer {
     }
 
     ctx.setLineDash([]); // Reset line dash
+
+    // Draw number markers along axes
+    const canvasWidth = this.renderer.width;
+    const canvasHeight = this.renderer.height;
+    
+    ctx.fillStyle = '#FFFFFF'; // White text for better visibility
+    ctx.strokeStyle = '#000000'; // Black outline
+    ctx.lineWidth = 2;
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // X-axis markers (along bottom, at ground level)
+    for (let x = 0; x <= width; x += 1.0) {
+      const screenX = viewport.worldToScreenX(x);
+      const screenY = viewport.worldToScreenY(groundLevel);
+      
+      // Only draw if within canvas bounds
+      if (screenX >= 0 && screenX <= canvasWidth) {
+        // Draw number slightly below ground line, but ensure it's within canvas
+        const textY = Math.min(screenY + 15, canvasHeight - 5);
+        const text = Math.round(x).toString();
+        
+        // Draw text with outline for visibility
+        ctx.strokeText(text, screenX, textY);
+        ctx.fillText(text, screenX, textY);
+      }
+    }
+
+    // Y-axis markers (along left edge)
+    ctx.textAlign = 'right';
+    for (let y = groundLevel; y <= groundLevel + height; y += 1.0) {
+      const screenX = viewport.worldToScreenX(0);
+      const screenY = viewport.worldToScreenY(y);
+      
+      // Only draw if within canvas bounds
+      if (screenY >= 0 && screenY <= canvasHeight) {
+        // Draw number slightly to the left of the left edge, but ensure it's within canvas
+        const textX = Math.max(screenX - 10, 30); // At least 30px from left edge
+        const text = Math.round(y).toString();
+        
+        // Draw text with outline for visibility
+        ctx.strokeText(text, textX, screenY);
+        ctx.fillText(text, textX, screenY);
+      }
+    }
+
+    // Reset text alignment
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
   }
 
   /**

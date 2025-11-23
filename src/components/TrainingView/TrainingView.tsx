@@ -542,8 +542,8 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
         const state = gameCore.physicsWorld.getCreatureState(creaturePhysics);
         const creature = new Creature(creaturePhysics.creature.design);
 
-        // Render creature
-        creatureRenderer.render(creature, creaturePhysics, state);
+        // Render creature with current actions for muscle color visualization
+        creatureRenderer.render(creature, creaturePhysics, state, currentActionRef.current);
 
         // Render reward in upper left corner
         const ctx = canvasRenderer.getContext();
@@ -666,10 +666,15 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
         <div style={{ marginTop: '20px' }}>
           <p>Status: {isRunning ? 'Running' : 'Not Started'}</p>
           {progress && (
-            <p>
-              Episode: {progress.currentEpisode} /{' '}
-              {progress.totalEpisodes || '∞'}
-            </p>
+            <>
+              <p>
+                Episode: {progress.currentEpisode} /{' '}
+                {progress.totalEpisodes || '∞'}
+              </p>
+              <p>
+                Experiences: {progress.totalExperiences.toLocaleString()}
+              </p>
+            </>
           )}
         </div>
         <div style={{ marginTop: '30px' }}>

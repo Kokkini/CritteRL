@@ -4,26 +4,19 @@
 
 import { TaskEnvironment } from './TaskEnvironment';
 import { Position } from '../utils/types';
-import { GameConstants } from '../utils/constants';
 
 export class ObservationBuilder {
   readonly observationSize: number;
   private environment: TaskEnvironment;
   private previousJointPositions: Position[] = [];
   private previousTargetPosition: Position = { x: 0, y: 0 };
-  private environmentBounds: { width: number; height: number };
 
   constructor(environment: TaskEnvironment) {
     this.environment = environment;
-    const envConfig = environment.config.environment;
-    this.environmentBounds = {
-      width: envConfig.width,
-      height: envConfig.height,
-    };
 
-    // Observation size: (num_joints * 2 * 2) + (2 * 2) = (num_joints * 4) + 4
+    // Observation size: 2 (COM) + (num_joints * 2) + 2 (target) + 2 (prev COM) + (num_joints * 2) + 2 (prev target) = (num_joints * 4) + 8
     // This will be set when we know the number of joints
-    this.observationSize = 4; // Minimum size (will be updated)
+    this.observationSize = 8; // Minimum size (will be updated)
   }
 
   /**
@@ -35,37 +28,66 @@ export class ObservationBuilder {
   ): number[] {
     const observation: number[] = [];
 
-    // Normalize positions
-    const normalizedJoints = jointPositions.map((pos) =>
-      this.normalizePosition(pos)
-    );
-    const normalizedTarget = this.normalizePosition(targetPosition);
+    // On first frame, initialize previous values to current values
+    if (this.previousJointPositions.length === 0) {
+      this.previousJointPositions = [...jointPositions];
+      this.previousTargetPosition = { ...targetPosition };
+    }
 
-    // Current frame: joint positions
+    // Calculate center of mass (mean of all joint positions)
+    const centerOfMass = this.calculateCenterOfMass(jointPositions);
+    const prevCOM = this.calculateCenterOfMass(this.previousJointPositions);
+
+    // Normalize center of mass positions
+    const normalizedCOM = this.normalizePosition(centerOfMass);
+    const normalizedPrevCOM = this.normalizePosition(prevCOM);
+    
+    observation.push(normalizedCOM.x, normalizedCOM.y);
+
+    // Make positions relative to center of mass and normalize
+    const normalizedJoints = jointPositions.map((pos) => {
+      const relativePos = {
+        x: pos.x - centerOfMass.x,
+        y: pos.y - centerOfMass.y
+      };
+      return this.normalizePosition(relativePos);
+    });
+
+    const relativeTarget = {
+      x: targetPosition.x - centerOfMass.x,
+      y: targetPosition.y - centerOfMass.y
+    };
+    const normalizedTarget = this.normalizePosition(relativeTarget);
+
+    // Current frame: joint positions (relative to COM)
     normalizedJoints.forEach((pos) => {
       observation.push(pos.x, pos.y);
     });
 
-    // Current frame: target position
+    // Current frame: target position (relative to COM)
     observation.push(normalizedTarget.x, normalizedTarget.y);
 
-    // Previous frame: joint positions (or zeros if first frame)
-    if (this.previousJointPositions.length === jointPositions.length) {
-      const normalizedPrevJoints = this.previousJointPositions.map((pos) =>
-        this.normalizePosition(pos)
-      );
+    // Previous frame: center of mass
+    observation.push(normalizedPrevCOM.x, normalizedPrevCOM.y);
+
+    // Previous frame: joint positions (relative to previous COM)
+    const normalizedPrevJoints = this.previousJointPositions.map((pos) => {
+      const relativePos = {
+        x: pos.x - prevCOM.x,
+        y: pos.y - prevCOM.y
+      };
+      return this.normalizePosition(relativePos);
+    });
       normalizedPrevJoints.forEach((pos) => {
         observation.push(pos.x, pos.y);
       });
-    } else {
-      // First frame: use zeros
-      jointPositions.forEach(() => {
-        observation.push(0, 0);
-      });
-    }
 
-    // Previous frame: target position
-    const normalizedPrevTarget = this.normalizePosition(this.previousTargetPosition);
+    // Previous frame: target position (relative to previous COM)
+    const relativePrevTarget = {
+      x: this.previousTargetPosition.x - prevCOM.x,
+      y: this.previousTargetPosition.y - prevCOM.y
+    };
+    const normalizedPrevTarget = this.normalizePosition(relativePrevTarget);
     observation.push(normalizedPrevTarget.x, normalizedPrevTarget.y);
 
     // Update previous frame state
@@ -76,18 +98,34 @@ export class ObservationBuilder {
   }
 
   /**
-   * Normalize position to [-1, 1] range based on environment bounds
+   * Calculate center of mass (mean position) from joint positions
+   */
+  calculateCenterOfMass(positions: Position[]): Position {
+    if (positions.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    const sum = positions.reduce(
+      (acc, pos) => ({
+        x: acc.x + pos.x,
+        y: acc.y + pos.y,
+      }),
+      { x: 0, y: 0 }
+    );
+
+    return {
+      x: sum.x / positions.length,
+      y: sum.y / positions.length,
+    };
+  }
+
+  /**
+   * Normalize position by dividing by 10
    */
   normalizePosition(pos: Position): Position {
-    const normalizedX =
-      (pos.x / this.environmentBounds.width) * 2 - 1; // Map [0, width] to [-1, 1]
-    const normalizedY =
-      (pos.y / this.environmentBounds.height) * 2 - 1; // Map [0, height] to [-1, 1]
-
-    // Clamp to [-1, 1]
     return {
-      x: Math.max(-1, Math.min(1, normalizedX)),
-      y: Math.max(-1, Math.min(1, normalizedY)),
+      x: pos.x / 10,
+      y: pos.y / 10,
     };
   }
 
@@ -95,8 +133,8 @@ export class ObservationBuilder {
    * Get observation size (depends on number of joints)
    */
   getObservationSize(numJoints: number): number {
-    // (num_joints * 2 * 2) + (2 * 2) = (num_joints * 4) + 4
-    return numJoints * 4 + 4;
+    // 2 (COM) + (num_joints * 2) + 2 (target) + 2 (prev COM) + (num_joints * 2) + 2 (prev target) = (num_joints * 4) + 8
+    return numJoints * 4 + 8;
   }
 
   /**

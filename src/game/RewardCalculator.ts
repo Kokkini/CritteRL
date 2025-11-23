@@ -16,14 +16,19 @@ export class RewardCalculator {
    * Calculate step reward
    */
   calculateStepReward(
-    deltaDistance: number,
+    currentDistance: number,
     deltaTime: number,
     isCompleted: boolean
   ): number {
     let reward = 0;
 
-    // Distance reward (positive when getting closer)
-    reward += this.config.distanceRewardFactor * deltaDistance;
+    // Distance progress reward: factor * (prev_dist - current_dist)
+    // Positive when getting closer (prev_dist > current_dist)
+    const deltaDistance = this.previousDistance - currentDistance;
+    reward += this.config.distanceProgressRewardFactor * deltaDistance;
+
+    // Absolute distance penalty: -factor * abs_distance * deltaTime
+    reward -= this.config.distancePenaltyFactor * currentDistance * deltaTime;
 
     // Time penalty (encourages faster completion)
     reward -= this.config.timePenaltyFactor * deltaTime;

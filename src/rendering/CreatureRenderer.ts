@@ -22,12 +22,13 @@ export class CreatureRenderer {
   render(
     creature: Creature,
     physics: CreaturePhysics,
-    state: CreatureState
+    state: CreatureState,
+    actions?: number[]
   ): void {
     const ctx = this.renderer.getContext();
 
     // Render muscles first (behind bones)
-    this.renderMuscles(creature, physics, ctx);
+    this.renderMuscles(creature, physics, ctx, actions);
 
     // Render bones
     this.renderBones(creature, physics, state, ctx);
@@ -149,13 +150,72 @@ export class CreatureRenderer {
   }
 
   /**
+   * Interpolate between two colors smoothly
+   * @param color1 - First color as hex string (e.g., '#0000FF')
+   * @param color2 - Second color as hex string (e.g., '#00FF00')
+   * @param t - Interpolation factor (0 = color1, 1 = color2)
+   * @returns Interpolated color as hex string
+   */
+  private interpolateColor(color1: string, color2: string, t: number): string {
+    // Clamp t to [0, 1]
+    t = Math.max(0, Math.min(1, t));
+    
+    // Parse hex colors to RGB
+    const parseHex = (hex: string): [number, number, number] => {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return [r, g, b];
+    };
+    
+    const [r1, g1, b1] = parseHex(color1);
+    const [r2, g2, b2] = parseHex(color2);
+    
+    // Linear interpolation
+    const r = Math.round(r1 + (r2 - r1) * t);
+    const g = Math.round(g1 + (g2 - g1) * t);
+    const b = Math.round(b1 + (b2 - b1) * t);
+    
+    // Convert back to hex
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
+  /**
+   * Get color for muscle based on action value with smooth interpolation
+   * @param action - Action value (typically ranges from MUSCLE_ACTION_MIN to MUSCLE_ACTION_MAX)
+   * @returns Color as hex string
+   */
+  private getActionColor(action: number): string {
+    // Normalize action to [0, 1] range
+    // Action ranges from MUSCLE_ACTION_MIN (-0.5) to MUSCLE_ACTION_MAX (0.5)
+    const minAction = GameConstants.MUSCLE_ACTION_MIN;
+    const maxAction = GameConstants.MUSCLE_ACTION_MAX;
+    const normalized = (action - minAction) / (maxAction - minAction);
+    
+    // Define color stops: Blue (min) -> Green (middle) -> Red (max)
+    const blue = '#0000FF';   // Strong contraction
+    const green = '#00FF00';  // Neutral
+    const red = '#FF0000';    // Strong extension
+    
+    // Interpolate between colors
+    if (normalized < 0.5) {
+      // Blue to Green (0 to 0.5)
+      return this.interpolateColor(blue, green, normalized * 2);
+    } else {
+      // Green to Red (0.5 to 1.0)
+      return this.interpolateColor(green, red, (normalized - 0.5) * 2);
+    }
+  }
+
+  /**
    * Render a muscle
    */
   private renderMuscle(
     muscle: { boneAId: string; boneBId: string; restLength?: number },
     bodyA: planck.Body,
     bodyB: planck.Body,
-    ctx: CanvasRenderingContext2D
+    ctx: CanvasRenderingContext2D,
+    action?: number
   ): void {
     const posA = bodyA.getPosition();
     const posB = bodyB.getPosition();
@@ -182,9 +242,14 @@ export class CreatureRenderer {
     const dy = posB.y - posA.y;
     const currentLength = Math.sqrt(dx * dx + dy * dy);
     
-    // Color based on muscle state (orange = normal, red = contracted, green = extended)
-    let strokeColor = '#FF9800'; // Orange (default)
-    if (muscle.restLength !== undefined) {
+    // Color based on action value (if provided), otherwise fall back to length-based coloring
+    let strokeColor = '#00FF00'; // Green (default)
+    
+    if (action !== undefined) {
+      // Smooth color interpolation based on action value
+      strokeColor = this.getActionColor(action);
+    } else if (muscle.restLength !== undefined) {
+      // Fallback to length-based coloring if no action provided
       const ratio = currentLength / muscle.restLength;
       if (ratio < 0.8) {
         strokeColor = '#FF0000'; // Red (contracted)
@@ -207,7 +272,8 @@ export class CreatureRenderer {
   private renderMuscles(
     creature: Creature,
     physics: CreaturePhysics,
-    ctx: CanvasRenderingContext2D
+    ctx: CanvasRenderingContext2D,
+    actions?: number[]
   ): void {
     const muscles = creature.getMuscles();
 
@@ -220,7 +286,8 @@ export class CreatureRenderer {
       const bodyB = physics.getBodyForBone(muscle.boneBId);
 
       if (bodyA && bodyB) {
-        this.renderMuscle(muscle, bodyA, bodyB, ctx);
+        const action = actions && actions[index] !== undefined ? actions[index] : undefined;
+        this.renderMuscle(muscle, bodyA, bodyB, ctx, action);
       } else {
         console.warn(`[CreatureRenderer] Muscle ${index} (${muscle.boneAId} -> ${muscle.boneBId}): missing bodies`);
       }

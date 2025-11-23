@@ -22,7 +22,8 @@ const DEFAULT_ENVIRONMENT: EnvironmentConfig = {
 };
 
 const DEFAULT_REWARD_CONFIG: RewardFunctionConfig = {
-  distanceRewardFactor: GameConstants.DEFAULT_DISTANCE_REWARD_FACTOR,
+  distanceProgressRewardFactor: GameConstants.DEFAULT_DISTANCE_PROGRESS_REWARD_FACTOR,
+  distancePenaltyFactor: GameConstants.DEFAULT_DISTANCE_PENALTY_FACTOR,
   timePenaltyFactor: GameConstants.DEFAULT_TIME_PENALTY_FACTOR,
   completionBonus: GameConstants.DEFAULT_COMPLETION_BONUS,
 };

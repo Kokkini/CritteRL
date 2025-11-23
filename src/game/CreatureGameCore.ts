@@ -251,16 +251,15 @@ export class CreatureGameCore implements GameCore {
       meanJointPosition
     );
     const previousDistance = this.taskEnvironment.getPreviousDistance();
-    const deltaDistance = previousDistance - currentDistance; // Positive when getting closer
 
     // Check completion
     const isCompleted = this.taskEnvironment.isCompleted(meanJointPosition);
     const isTimeLimitReached = this.taskEnvironment.isTimeLimitReached();
     const done = isCompleted || isTimeLimitReached;
 
-    // Calculate reward
+    // Calculate reward (pass current distance for milestone checking)
     const reward = this.rewardCalculator.calculateStepReward(
-      deltaDistance,
+      currentDistance,
       deltaTime,
       isCompleted
     );

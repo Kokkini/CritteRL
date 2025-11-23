@@ -97,7 +97,8 @@ export interface EnvironmentConfig {
 
 // Reward function configuration
 export interface RewardFunctionConfig {
-  distanceRewardFactor: number;
+  distanceProgressRewardFactor: number; // Reward for making progress (milestone rewards)
+  distancePenaltyFactor: number; // Penalty based on absolute distance from target
   timePenaltyFactor: number;
   completionBonus: number;
 }
@@ -146,6 +147,7 @@ export interface TrainingMetrics {
 export interface TrainingProgress {
   currentEpisode: number;
   totalEpisodes: number | null;
+  totalExperiences: number;
   averageReward: number;
   completionRate: number;
   isRunning: boolean;
@@ -203,7 +205,7 @@ export interface TrainedModel {
     networkArchitecture: unknown;
     policyNetwork: unknown;
     valueNetwork: unknown;
-    learnableStd: { data: number[]; shape: number[]; dtype: string };
+    learnableLogStd: { data: number[]; shape: number[]; dtype: string };
     metadata: unknown;
   };
 }

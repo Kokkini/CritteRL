@@ -11,7 +11,7 @@ export class GameConstants {
   static readonly DEFAULT_FPS = 60;
 
   // Episode settings
-  static readonly DEFAULT_EPISODE_TIME = 10; // seconds
+  static readonly DEFAULT_EPISODE_TIME = 5; // seconds
   static readonly DEFAULT_COMPLETION_RADIUS = 0.5; // meters
 
   // Storage
@@ -33,7 +33,7 @@ export class GameConstants {
   // Creature design defaults
   static readonly DEFAULT_BONE_THICKNESS = 0.1; // meters (thickness perpendicular to bone length)
   static readonly DEFAULT_BONE_DENSITY = 10.0; // kg/m² (density used to calculate bone mass = density × area)
-  static readonly DEFAULT_MUSCLE_MAX_FORCE = 100.0; // Newtons (maximum force a muscle can apply)
+  static readonly DEFAULT_MUSCLE_MAX_FORCE = 500.0; // Newtons (maximum force a muscle can apply)
   
   // Debug force test (for CreatureDebugPage)
   static readonly DEBUG_FORCE_MAGNITUDE = 100.0; // Newtons (constant force applied when arrow keys pressed)
@@ -70,7 +70,8 @@ export class GameConstants {
   static readonly MUSCLE_ACTION_MAX = 0.5; // Maximum action value (full expansion)
 
   // Reward defaults
-  static readonly DEFAULT_DISTANCE_REWARD_FACTOR = 0.1; // reward per meter closer to the target
+  static readonly DEFAULT_DISTANCE_PROGRESS_REWARD_FACTOR = 0.1; // reward per meter closer to the target
+  static readonly DEFAULT_DISTANCE_PENALTY_FACTOR = 0.01; // penalty per meter of absolute distance per second
   static readonly DEFAULT_TIME_PENALTY_FACTOR = 0.01; // time penalty per second
   static readonly DEFAULT_COMPLETION_BONUS = 1.0;
 
@@ -89,29 +90,30 @@ export class GameConstants {
   static readonly DEFAULT_TEST_TIMESTEP = 1 / 60; // 60 FPS
 
   // RL Training hyperparameters
-  static readonly RL_LEARNING_RATE = 0.001;
+  static readonly RL_LEARNING_RATE = 0.0005;
   static readonly RL_GAMMA = 0.99; // Discount factor
   static readonly RL_LAMBDA = 0.95; // GAE lambda
   static readonly RL_CLIP_EPSILON = 0.2; // PPO clip ratio
   static readonly RL_VALUE_COEFF = 0.5; // Value loss coefficient
-  static readonly RL_ENTROPY_COEFF = 0.01; // Entropy coefficient
+  static readonly RL_ENTROPY_COEFF = 0.003; // Entropy coefficient
   static readonly RL_MAX_GRAD_NORM = 0.5; // Gradient clipping
   static readonly RL_EPOCHS = 4; // Training epochs per update
-  static readonly RL_MINI_BATCH_SIZE = 64; // Mini-batch size for PPO training
+  static readonly RL_MINI_BATCH_SIZE = 128; // Mini-batch size for PPO training
 
   // RL Training session defaults
-  static readonly RL_MAX_EPISODES = 10000; // Maximum training episodes
+  static readonly RL_MAX_EPISODES = 1000000; // Maximum training episodes
   static readonly RL_AUTO_SAVE_INTERVAL = 100; // Auto-save every N episodes
   static readonly RL_PARALLEL_GAMES = 1; // Number of parallel rollouts
 
   // RL Network architecture
   static readonly RL_HIDDEN_LAYERS = [64, 32]; // Policy and value network hidden layers
   static readonly RL_ACTIVATION = 'relu'; // Activation function
+  static readonly RL_INITIAL_LOG_STD = 0.0; // Initial log standard deviation for continuous actions (std = exp(0) = 1.0)
 
   // RL Rollout configuration
   static readonly RL_ROLLOUT_MAX_LENGTH = 4096; // Maximum steps per rollout
-  static readonly RL_ROLLOUT_DELTA_TIME = 1 / 16; // Physics timestep (60 FPS)
-  static readonly RL_ROLLOUT_ACTION_INTERVAL = 1 / 4; // Action interval in seconds
+  static readonly RL_ROLLOUT_DELTA_TIME = 1 / 32; // Physics timestep (60 FPS)
+  static readonly RL_ROLLOUT_ACTION_INTERVAL = 1 / 16; // Action interval in seconds
   static readonly RL_ROLLOUT_YIELD_INTERVAL = 20; // Yield every N steps for UI responsiveness
 }
 

@@ -28,7 +28,7 @@ export default function TrainingControls({
           style={{ padding: '10px 20px', marginRight: '10px', backgroundColor: '#4a9eff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
         >
           Save Brain
-        </button>
+          </button>
       )}
     </div>
   );

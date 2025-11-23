@@ -403,9 +403,16 @@ export class TrainingService {
       active.session.currentEpisode = currentEpisode;
     }
 
+    // Get total experiences from MimicRL session (tracked as experiences are collected)
+    let totalExperiences = 0;
+    if (active.mimicRLSession) {
+      totalExperiences = active.mimicRLSession.totalExperiences || 0;
+    }
+
     return {
       currentEpisode,
       totalEpisodes: active.session.config.maxEpisodes || null,
+      totalExperiences,
       averageReward: active.session.metrics.averageReward,
       completionRate: active.session.metrics.completionRate,
       isRunning: active.session.status === 'running' && active.mimicRLSession?.isTraining === true,

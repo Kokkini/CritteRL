@@ -11,6 +11,7 @@ import {
   Position,
 } from './types';
 import { validateCreatureDesign, ValidationResult } from './validation';
+import { GameConstants } from './constants';
 
 export class CreatureDesignImpl implements CreatureDesign {
   id: string;
@@ -104,14 +105,20 @@ export class CreatureDesignImpl implements CreatureDesign {
   }
 
   toJSON(): string {
+    // Save bones without density (will be set from constants on load)
+    const bonesToSave = this.bones.map(({ density, ...bone }) => bone);
+    
+    // Save muscles without maxForce (will be set from constants on load)
+    const musclesToSave = this.muscles.map(({ maxForce, ...muscle }) => muscle);
+    
     return JSON.stringify({
       id: this.id,
       name: this.name,
       createdAt: this.createdAt.toISOString(),
       updatedAt: this.updatedAt.toISOString(),
-      bones: this.bones,
+      bones: bonesToSave,
       joints: this.joints,
-      muscles: this.muscles,
+      muscles: musclesToSave,
     });
   }
 
@@ -121,9 +128,23 @@ export class CreatureDesignImpl implements CreatureDesign {
     design.id = data.id;
     design.createdAt = new Date(data.createdAt);
     design.updatedAt = new Date(data.updatedAt);
-    design.bones = data.bones;
+    
+    // Load bones and set density from constants (not saved)
+    const loadedBones = data.bones as Array<Omit<Bone, 'density'>>;
+    design.bones = loadedBones.map((bone) => ({
+      ...bone,
+      density: GameConstants.DEFAULT_BONE_DENSITY,
+    }));
+    
     design.joints = data.joints;
-    design.muscles = data.muscles;
+    
+    // Load muscles and set maxForce from constants (not saved)
+    const loadedMuscles = data.muscles as Array<Omit<Muscle, 'maxForce'>>;
+    design.muscles = loadedMuscles.map((muscle) => ({
+      ...muscle,
+      maxForce: GameConstants.DEFAULT_MUSCLE_MAX_FORCE,
+    }));
+    
     return design;
   }
 }

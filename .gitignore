@@ -26,7 +26,6 @@ lerna-debug.log*
 # Editor directories and files
 .vscode/
 .idea/
-.cursor/
 *.swp
 *.swo
 *~

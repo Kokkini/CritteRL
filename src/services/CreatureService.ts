@@ -45,14 +45,21 @@ export class CreatureService {
 
     try {
       const key = `${STORAGE_KEY_PREFIX}${design.id}`;
+      
+      // Save bones without density (will be set from constants on load)
+      const bonesToSave = design.bones.map(({ density, ...bone }) => bone);
+      
+      // Save muscles without maxForce (will be set from constants on load)
+      const musclesToSave = design.muscles.map(({ maxForce, ...muscle }) => muscle);
+      
       await this.storageService.saveToLocalStorage(key, {
         id: design.id,
         name: design.name,
         createdAt: design.createdAt.toISOString(),
         updatedAt: design.updatedAt.toISOString(),
-        bones: design.bones,
+        bones: bonesToSave,
         joints: design.joints,
-        muscles: design.muscles,
+        muscles: musclesToSave,
       });
     } catch (error) {
       if (error instanceof QuotaExceededError) {
@@ -87,7 +94,13 @@ export class CreatureService {
       design.id = data.id;
       design.createdAt = new Date(data.createdAt);
       design.updatedAt = new Date(data.updatedAt);
-      design.bones = data.bones as CreatureDesign['bones'];
+      
+      // Load bones and set density from constants (not saved)
+      const loadedBones = data.bones as Array<Omit<CreatureDesign['bones'][0], 'density'>>;
+      design.bones = loadedBones.map((bone) => ({
+        ...bone,
+        density: GameConstants.DEFAULT_BONE_DENSITY,
+      }));
       
       // Load joints and apply migration: set default angle limits if not already set
       const loadedJoints = data.joints as Joint[];
@@ -104,7 +117,12 @@ export class CreatureService {
         return joint;
       });
       
-      design.muscles = data.muscles as CreatureDesign['muscles'];
+      // Load muscles and set maxForce from constants (not saved)
+      const loadedMuscles = data.muscles as Array<Omit<CreatureDesign['muscles'][0], 'maxForce'>>;
+      design.muscles = loadedMuscles.map((muscle) => ({
+        ...muscle,
+        maxForce: GameConstants.DEFAULT_MUSCLE_MAX_FORCE,
+      }));
 
       // Validate loaded data
       const validation = this.validateCreature(design);
