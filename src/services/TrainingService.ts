@@ -65,17 +65,11 @@ export class TrainingService {
     }
 
     // Create game core for training (headless)
-    // Store design/config for cloning in rollout collectors
     const gameCore = new CreatureGameCore(
       creatureDesign,
       task.config,
       task.rewardFunction
     );
-    
-    // Store design and config for cloning game cores in rollouts
-    (gameCore as any).creatureDesign = creatureDesign;
-    (gameCore as any).taskConfig = task.config;
-    (gameCore as any).rewardConfig = task.rewardFunction;
 
     // Create controllers (only player 0 is trainable)
     const controllers: (PlayerController | null)[] = [null]; // Will be replaced with PolicyController
