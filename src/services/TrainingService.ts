@@ -68,7 +68,8 @@ export class TrainingService {
     const gameCore = new CreatureGameCore(
       creatureDesign,
       task.config,
-      task.rewardFunction
+      task.rewardFunction,
+      task.type
     );
 
     // Create controllers (only player 0 is trainable)
@@ -292,6 +293,17 @@ export class TrainingService {
       throw new Error('No trained model available');
     }
 
+    // Get task name for default model name
+    let taskName = '';
+    try {
+      const task = await this.taskService.getTask(active.session.taskId);
+      if (task) {
+        taskName = task.name;
+      }
+    } catch (error) {
+      console.warn('[TrainingService] Failed to get task name for model:', error);
+    }
+
     // Extract model weights from PolicyAgent
     const policyAgent = active.mimicRLSession.policyAgent;
     const policyWeights: Float32Array[] = [];
@@ -318,10 +330,18 @@ export class TrainingService {
     // Export full bundle for easy loading (includes network architecture, etc.)
     const exportBundle = active.mimicRLSession.exportAgentWeights();
 
+    // Generate default name with task name if not provided
+    const now = new Date();
+    const dateStr = now.toLocaleDateString();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const defaultName = taskName 
+      ? `${taskName} - ${dateStr} ${timeStr}`
+      : `Model ${dateStr} ${timeStr}`;
+
     const model: TrainedModel = {
       id: nanoid(),
       creatureDesignId: active.session.creatureDesignId,
-      name: name || `Model ${new Date().toLocaleDateString()}`,
+      name: name || defaultName,
       createdAt: active.session.startedAt,
       trainedAt: new Date(),
       episodes: active.session.currentEpisode,

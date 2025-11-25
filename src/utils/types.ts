@@ -79,11 +79,12 @@ export interface CreatureState {
 
 // Task configuration
 export interface TaskConfig {
-  targetPosition: Position;
+  targetPosition?: Position; // Optional (not needed for running task)
   startPosition: Position;
   maxEpisodeTime: number;
-  completionRadius: number;
+  completionRadius?: number; // Optional (not needed for running task)
   environment: EnvironmentConfig;
+  runningDirection?: { x: number; y: number }; // Unit vector for running task
 }
 
 // Environment configuration
@@ -108,7 +109,7 @@ export interface Task {
   id: string;
   name: string;
   description: string;
-  type: 'reach_target' | 'jump' | 'climb' | 'fly';
+  type: 'reach_target' | 'running' | 'jump' | 'climb' | 'fly';
   config: TaskConfig;
   rewardFunction: RewardFunctionConfig;
 }

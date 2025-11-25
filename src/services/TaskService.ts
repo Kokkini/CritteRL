@@ -45,12 +45,37 @@ const DEFAULT_TASK: Task = {
   rewardFunction: DEFAULT_REWARD_CONFIG,
 };
 
+// Running task configuration
+const RUNNING_REWARD_CONFIG: RewardFunctionConfig = {
+  distanceProgressRewardFactor: GameConstants.DEFAULT_RUNNING_REWARD_FACTOR,
+  distancePenaltyFactor: 0, // No absolute distance penalty for running
+  timePenaltyFactor: GameConstants.DEFAULT_RUNNING_TIME_PENALTY,
+  completionBonus: 0, // No completion bonus (episode ends on time limit)
+};
+
+const RUNNING_TASK_CONFIG: TaskConfig = {
+  startPosition: GameConstants.DEFAULT_START_POSITION,
+  maxEpisodeTime: GameConstants.DEFAULT_EPISODE_TIME,
+  environment: DEFAULT_ENVIRONMENT,
+  // targetPosition and completionRadius not needed for running task
+};
+
+const RUNNING_TASK: Task = {
+  id: GameConstants.DEFAULT_RUNNING_TASK_ID,
+  name: GameConstants.DEFAULT_RUNNING_TASK_NAME,
+  description: 'Run as far as possible in the given direction',
+  type: 'running',
+  config: RUNNING_TASK_CONFIG,
+  rewardFunction: RUNNING_REWARD_CONFIG,
+};
+
 export class TaskService {
   private tasks: Map<string, Task> = new Map();
   private storageService: StorageService;
 
   constructor(storageService?: StorageService) {
-    // Initialize with default task
+    // Initialize with default tasks
+    this.tasks.set(GameConstants.DEFAULT_RUNNING_TASK_ID, RUNNING_TASK);
     this.tasks.set(GameConstants.DEFAULT_TASK_ID, DEFAULT_TASK);
     this.storageService = storageService || new StorageService();
   }
@@ -74,6 +99,14 @@ export class TaskService {
    */
   getDefaultTask(): Task {
     return DEFAULT_TASK;
+  }
+
+  /**
+   * Get task by type
+   */
+  async getTaskByType(type: Task['type']): Promise<Task | null> {
+    const tasks = await this.getAvailableTasks();
+    return tasks.find(task => task.type === type) || null;
   }
 
   /**

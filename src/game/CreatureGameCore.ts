@@ -10,11 +10,14 @@ import {
   ActionSpace,
 } from '../MimicRL/core/GameCore';
 import { Creature } from './Creature';
-import { CreatureDesign, TaskConfig, RewardFunctionConfig, Position } from '../utils/types';
+import { CreatureDesign, TaskConfig, RewardFunctionConfig, Position, Task } from '../utils/types';
 import { PhysicsWorld } from './PhysicsWorld';
 import { TaskEnvironment } from './TaskEnvironment';
+import { RunningTaskEnvironment } from './RunningTaskEnvironment';
 import { RewardCalculator } from './RewardCalculator';
+import { RunningRewardCalculator } from './RunningRewardCalculator';
 import { ObservationBuilder } from './ObservationBuilder';
+import { RunningObservationBuilder } from './RunningObservationBuilder';
 import { CreaturePhysics } from '../physics/CreaturePhysics';
 import { GameConstants } from '../utils/constants';
 import * as planck from 'planck';
@@ -26,39 +29,80 @@ export class CreatureGameCore implements GameCore {
 
   private creature: Creature;
   public readonly physicsWorld: PhysicsWorld;
-  public readonly taskEnvironment: TaskEnvironment;
-  private rewardCalculator: RewardCalculator;
-  private observationBuilder: ObservationBuilder;
+  public readonly taskEnvironment: TaskEnvironment | RunningTaskEnvironment;
+  private rewardCalculator: RewardCalculator | RunningRewardCalculator;
+  private observationBuilder: ObservationBuilder | RunningObservationBuilder;
   public creaturePhysics: CreaturePhysics | null = null;
   private stepCount: number = 0;
   private episodeStartTime: number = 0;
+  public readonly taskType: Task['type'];
 
   constructor(
     creatureDesign: CreatureDesign,
     taskConfig: TaskConfig,
-    rewardConfig: RewardFunctionConfig
+    rewardConfig: RewardFunctionConfig,
+    taskType?: Task['type']
   ) {
     this.creature = new Creature(creatureDesign);
     this.physicsWorld = new PhysicsWorld(taskConfig.environment.gravity);
 
-    // Create task environment
-    this.taskEnvironment = new TaskEnvironment(taskConfig);
+    // Detect task type: use provided taskType or infer from config
+    this.taskType = taskType || (taskConfig.targetPosition ? 'reach_target' : 'running');
 
-    // Create reward calculator
-    this.rewardCalculator = new RewardCalculator(rewardConfig);
+    // Create task-specific components using factory methods
+    this.taskEnvironment = this.createTaskEnvironment(taskConfig);
+    this.rewardCalculator = this.createRewardCalculator(rewardConfig);
+    this.observationBuilder = this.createObservationBuilder(taskConfig, this.taskEnvironment);
 
-    // Create observation builder
-    this.observationBuilder = new ObservationBuilder(this.taskEnvironment);
-
-    // Calculate observation size based on number of joints (bones)
+    // Calculate observation size based on task type
+    if (this.taskType === 'running') {
+      this.observationSize = 8; // Fixed size for running task
+    } else {
     const numJoints = creatureDesign.bones.length;
-    this.observationSize = this.observationBuilder.getObservationSize(numJoints);
+      this.observationSize = (this.observationBuilder as ObservationBuilder).getObservationSize(numJoints);
+    }
 
     // Action size = number of muscles
     this.actionSize = creatureDesign.muscles.length;
 
     // Initialize physics
     this.initializePhysics();
+  }
+
+  /**
+   * Factory method to create task environment based on task type
+   */
+  private createTaskEnvironment(config: TaskConfig): TaskEnvironment | RunningTaskEnvironment {
+    if (this.taskType === 'running') {
+      return new RunningTaskEnvironment(config);
+    } else {
+      return new TaskEnvironment(config);
+    }
+  }
+
+  /**
+   * Factory method to create reward calculator based on task type
+   */
+  private createRewardCalculator(config: RewardFunctionConfig): RewardCalculator | RunningRewardCalculator {
+    if (this.taskType === 'running') {
+      return new RunningRewardCalculator(config);
+    } else {
+      return new RewardCalculator(config);
+    }
+  }
+
+  /**
+   * Factory method to create observation builder based on task type
+   */
+  private createObservationBuilder(
+    config: TaskConfig,
+    taskEnv: TaskEnvironment | RunningTaskEnvironment
+  ): ObservationBuilder | RunningObservationBuilder {
+    if (this.taskType === 'running') {
+      return new RunningObservationBuilder(config.environment.groundLevel);
+    } else {
+      return new ObservationBuilder(taskEnv as TaskEnvironment);
+    }
   }
 
   /**
@@ -182,16 +226,19 @@ export class CreatureGameCore implements GameCore {
     // Reset task environment with initial position
     this.taskEnvironment.reset(meanPos);
 
-    // Reset reward calculator
-    const initialDistance = this.taskEnvironment.getDistanceToTarget(meanPos);
-    this.rewardCalculator.reset(initialDistance);
-    this.taskEnvironment.updatePreviousDistance(initialDistance);
+    // Reset reward calculator (task-specific)
+    if (this.taskType === 'running') {
+      (this.rewardCalculator as RunningRewardCalculator).reset();
+    } else {
+      const initialDistance = (this.taskEnvironment as TaskEnvironment).getDistanceToTarget(meanPos);
+      (this.rewardCalculator as RewardCalculator).reset(initialDistance);
+      (this.taskEnvironment as TaskEnvironment).updatePreviousDistance(initialDistance);
+    }
 
     // Reset observation builder
     this.observationBuilder.reset();
 
-    // Build initial observation
-    // Always use physics positions (in meters) - use design positions if physics not available
+    // Build initial observation (task-specific)
     let jointPositions: Position[];
     if (this.creaturePhysics) {
       jointPositions = this.creaturePhysics.getJointPositions();
@@ -202,11 +249,23 @@ export class CreatureGameCore implements GameCore {
         y: b.position.y,
       }));
     }
-    const targetPos = this.taskEnvironment.getTargetPosition();
-    const observation = this.observationBuilder.buildObservation(
+
+    let observation: number[];
+    if (this.taskType === 'running') {
+      const runningEnv = this.taskEnvironment as RunningTaskEnvironment;
+      const runningDirection = runningEnv.getRunningDirection();
+      observation = (this.observationBuilder as RunningObservationBuilder).buildObservation(
+        jointPositions,
+        this.creaturePhysics!,
+        runningDirection
+      );
+    } else {
+      const targetPos = (this.taskEnvironment as TaskEnvironment).getTargetPosition();
+      observation = (this.observationBuilder as ObservationBuilder).buildObservation(
       jointPositions,
       targetPos
     );
+    }
 
     return {
       observations: [observation],
@@ -244,35 +303,66 @@ export class CreatureGameCore implements GameCore {
     // Get current state
     const jointPositions = this.creaturePhysics.getJointPositions();
     const meanJointPosition = this.calculateMeanPosition(jointPositions);
-    const targetPos = this.taskEnvironment.getTargetPosition();
+
+    // Task-specific logic
+    let reward: number;
+    let done: boolean;
+    let isCompleted: boolean = false;
+    let isTimeLimitReached: boolean;
+    let observation: number[];
+
+    if (this.taskType === 'running') {
+      // Running task logic
+      const runningEnv = this.taskEnvironment as RunningTaskEnvironment;
+      isTimeLimitReached = runningEnv.isTimeLimitReached();
+      done = isTimeLimitReached;
+
+      // Calculate delta distance in running direction
+      const deltaDistanceInDirection = runningEnv.getDeltaDistanceInDirection(meanJointPosition);
+
+      // Calculate reward
+      reward = (this.rewardCalculator as RunningRewardCalculator).calculateStepReward(
+        deltaDistanceInDirection,
+        deltaTime
+      );
+
+      // Build observation
+      const runningDirection = runningEnv.getRunningDirection();
+      observation = (this.observationBuilder as RunningObservationBuilder).buildObservation(
+        jointPositions,
+        this.creaturePhysics,
+        runningDirection
+      );
+    } else {
+      // Reach target task logic
+      const taskEnv = this.taskEnvironment as TaskEnvironment;
+      const targetPos = taskEnv.getTargetPosition();
 
     // Calculate distance to target
-    const currentDistance = this.taskEnvironment.getDistanceToTarget(
-      meanJointPosition
-    );
-    const previousDistance = this.taskEnvironment.getPreviousDistance();
+      const currentDistance = taskEnv.getDistanceToTarget(meanJointPosition);
 
     // Check completion
-    const isCompleted = this.taskEnvironment.isCompleted(meanJointPosition);
-    const isTimeLimitReached = this.taskEnvironment.isTimeLimitReached();
-    const done = isCompleted || isTimeLimitReached;
+      isCompleted = taskEnv.isCompleted(meanJointPosition);
+      isTimeLimitReached = taskEnv.isTimeLimitReached();
+      done = isCompleted || isTimeLimitReached;
 
-    // Calculate reward (pass current distance for milestone checking)
-    const reward = this.rewardCalculator.calculateStepReward(
-      currentDistance,
+    // Calculate reward
+      reward = (this.rewardCalculator as RewardCalculator).calculateStepReward(
+        currentDistance,
       deltaTime,
       isCompleted
     );
 
     // Update previous distance
-    this.taskEnvironment.updatePreviousDistance(currentDistance);
-    this.rewardCalculator.updatePreviousDistance(currentDistance);
+      taskEnv.updatePreviousDistance(currentDistance);
+      (this.rewardCalculator as RewardCalculator).updatePreviousDistance(currentDistance);
 
     // Build observation
-    const observation = this.observationBuilder.buildObservation(
+      observation = (this.observationBuilder as ObservationBuilder).buildObservation(
       jointPositions,
       targetPos
     );
+    }
 
     // Determine outcome
     let outcome: ('win' | 'loss' | 'tie')[] | null = null;
@@ -294,7 +384,7 @@ export class CreatureGameCore implements GameCore {
       info: {
         stepCount: this.stepCount,
         elapsedTime,
-        distanceToTarget: currentDistance,
+        distanceToTarget: this.taskType === 'running' ? undefined : (this.taskEnvironment as TaskEnvironment).getDistanceToTarget(meanJointPosition),
         completed: isCompleted,
       },
     };
@@ -336,15 +426,25 @@ export class CreatureGameCore implements GameCore {
       return null;
     }
 
+    if (this.taskType === 'running') {
+      const runningEnv = this.taskEnvironment as RunningTaskEnvironment;
+      const isTimeLimitReached = runningEnv.isTimeLimitReached();
+      if (isTimeLimitReached) {
+        return ['loss']; // Time limit reached = loss for running task
+      }
+      return null;
+    } else {
+      const taskEnv = this.taskEnvironment as TaskEnvironment;
     const jointPositions = this.creaturePhysics.getJointPositions();
     const meanJointPosition = this.calculateMeanPosition(jointPositions);
-    const isCompleted = this.taskEnvironment.isCompleted(meanJointPosition);
-    const isTimeLimitReached = this.taskEnvironment.isTimeLimitReached();
+      const isCompleted = taskEnv.isCompleted(meanJointPosition);
+      const isTimeLimitReached = taskEnv.isTimeLimitReached();
 
     if (isCompleted) {
       return ['win'];
     } else if (isTimeLimitReached) {
       return ['loss'];
+      }
     }
 
     return null;

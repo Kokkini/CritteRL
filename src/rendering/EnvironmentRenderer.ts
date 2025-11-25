@@ -17,14 +17,29 @@ export class EnvironmentRenderer {
    */
   renderEnvironment(
     environment: EnvironmentConfig,
-    target: Position
+    target: Position,
+    taskType?: 'reach_target' | 'running',
+    runningDirection?: { x: number; y: number },
+    creatureCenter?: Position
   ): void {
     // Render grid first (background)
     this.renderGrid(environment.width, environment.height, environment.groundLevel);
     // Then render other elements
     this.renderGround(environment.groundLevel, environment.width);
     // Walls removed - not rendering walls
+    
+    // Render task-specific elements
+    if (taskType === 'running' && runningDirection) {
+      // Don't render target for running task
+      // Render running direction arrow
+      if (creatureCenter) {
+        this.renderRunningDirection(runningDirection, creatureCenter);
+      }
+    } else {
+      // Render target for reach_target task
     this.renderTarget(target, 0.5); // 0.5 meter radius
+    }
+    
     this.renderBoundaries(environment.width, environment.height);
   }
 
@@ -335,6 +350,85 @@ export class EnvironmentRenderer {
       topWallWidthPx,
       topWallThicknessPx
     );
+  }
+
+  /**
+   * Render running direction arrow
+   * @param direction - Unit vector (x, y) for running direction
+   * @param centerPosition - Center position of creature (where to draw arrow)
+   */
+  renderRunningDirection(
+    direction: { x: number; y: number },
+    centerPosition: Position
+  ): void {
+    const ctx = this.renderer.getContext();
+    const viewport = this.renderer.getViewport();
+    
+    if (!viewport) {
+      console.warn('[EnvironmentRenderer] No viewport available for direction arrow');
+      return;
+    }
+
+    // Convert world coordinates to screen coordinates
+    const centerScreenX = viewport.worldToScreenX(centerPosition.x);
+    const centerScreenY = viewport.worldToScreenY(centerPosition.y);
+
+    // Arrow parameters
+    const arrowLength = 2.0; // 2 meters in world units
+    const arrowHeadSize = 0.5; // 0.5 meters
+    const arrowOffsetY = 1.5; // 1.5 meters above creature center
+
+    // Calculate arrow end position
+    const arrowEndX = centerPosition.x + direction.x * arrowLength;
+    const arrowEndY = centerPosition.y + direction.y * arrowLength + arrowOffsetY;
+    const arrowEndScreenX = viewport.worldToScreenX(arrowEndX);
+    const arrowEndScreenY = viewport.worldToScreenY(arrowEndY);
+
+    // Arrow start position (above creature)
+    const arrowStartY = centerPosition.y + arrowOffsetY;
+    const arrowStartScreenX = centerScreenX;
+    const arrowStartScreenY = viewport.worldToScreenY(arrowStartY);
+
+    // Color based on direction (green for positive X, red for negative X)
+    const arrowColor = direction.x > 0 ? '#00FF00' : '#FF0000';
+
+    // Draw arrow line
+    ctx.strokeStyle = arrowColor;
+    ctx.fillStyle = arrowColor;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(arrowStartScreenX, arrowStartScreenY);
+    ctx.lineTo(arrowEndScreenX, arrowEndScreenY);
+    ctx.stroke();
+
+    // Draw arrowhead
+    const angle = Math.atan2(direction.y, direction.x);
+    const headSizePx = viewport.worldToScreenDistance(arrowHeadSize);
+    
+    ctx.beginPath();
+    ctx.moveTo(arrowEndScreenX, arrowEndScreenY);
+    ctx.lineTo(
+      arrowEndScreenX - headSizePx * Math.cos(angle - Math.PI / 6),
+      arrowEndScreenY - headSizePx * Math.sin(angle - Math.PI / 6)
+    );
+    ctx.lineTo(
+      arrowEndScreenX - headSizePx * Math.cos(angle + Math.PI / 6),
+      arrowEndScreenY - headSizePx * Math.sin(angle + Math.PI / 6)
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw direction label
+    ctx.fillStyle = arrowColor;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    const labelY = arrowStartScreenY - 10;
+    const labelText = direction.x > 0 ? '→' : '←';
+    ctx.strokeText(labelText, arrowStartScreenX, labelY);
+    ctx.fillText(labelText, arrowStartScreenX, labelY);
   }
 }
 

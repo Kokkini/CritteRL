@@ -74,11 +74,11 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
       const init = async () => {
         try {
           console.log('[TrainingView] Initializing services...');
-          const storage = new StorageService();
-          await storage.initialize();
-          const taskService = new TaskService();
-          const creatureService = new CreatureService(storage);
-          trainingServiceRef.current = new TrainingService(storage, taskService, creatureService);
+        const storage = new StorageService();
+        await storage.initialize();
+        const taskService = new TaskService();
+        const creatureService = new CreatureService(storage);
+        trainingServiceRef.current = new TrainingService(storage, taskService, creatureService);
           console.log('[TrainingView] Services initialized');
           setIsInitialized(true);
 
@@ -296,7 +296,8 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
         const vizGameCore = new CreatureGameCore(
           creatureDesign,
           task.config,
-          task.rewardFunction
+          task.rewardFunction,
+          task.type
         );
         gameCoreRef.current = vizGameCore;
         physicsWorldRef.current = vizGameCore.physicsWorld;
@@ -387,10 +388,8 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
         }
 
         // Save the trained model (the creature design is already saved separately in the editor)
-        const model = await trainingServiceRef.current.saveTrainedModel(
-          sessionId,
-          `Brain for ${creatureDesignId} - ${new Date().toLocaleString()}`
-        );
+        // Don't pass a name - let it use the default format that includes task name
+        const model = await trainingServiceRef.current.saveTrainedModel(sessionId);
 
         alert(`Brain saved successfully!\nModel ID: ${model.id}\nEpisodes: ${model.episodes}`);
       } catch (error) {
@@ -425,9 +424,21 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
           // If no creature physics yet, just render environment
           const task = gameCore.taskEnvironment;
           const envConfig = task.config.environment;
-          const targetPos = task.getTargetPosition();
+          const taskType = gameCore.taskType || 'reach_target';
+          let targetPos = { x: 0, y: 0 };
+          let runningDirection: { x: number; y: number } | undefined;
+          let creatureCenter: Position | undefined;
+          
+          if (taskType === 'running') {
+            const runningEnv = task as any;
+            runningDirection = runningEnv.getRunningDirection?.();
+            creatureCenter = { x: envConfig.width / 2, y: envConfig.groundLevel + 2 };
+          } else {
+            targetPos = (task as any).getTargetPosition?.() || { x: 0, y: 0 };
+          }
+          
           canvasRenderer.clear();
-          environmentRenderer.renderEnvironment(envConfig, targetPos);
+          environmentRenderer.renderEnvironment(envConfig, targetPos, taskType, runningDirection, creatureCenter);
           
           // Always continue render loop
           renderingFrameRef.current = requestAnimationFrame(render);
@@ -533,10 +544,26 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
         // Get task environment for rendering
         const task = gameCore.taskEnvironment;
         const envConfig = task.config.environment;
-        const targetPos = task.getTargetPosition();
+        const taskType = (gameCore as any).taskType || 'reach_target';
+        let targetPos = { x: 0, y: 0 };
+        let runningDirection: { x: number; y: number } | undefined;
+        let creatureCenter: Position | undefined;
+        
+        if (taskType === 'running') {
+          const runningEnv = task as any;
+          runningDirection = runningEnv.getRunningDirection?.();
+          // Calculate creature center from joint positions
+          const jointPositions = creaturePhysics.getJointPositions();
+          if (jointPositions.length > 0) {
+            const sum = jointPositions.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 });
+            creatureCenter = { x: sum.x / jointPositions.length, y: sum.y / jointPositions.length };
+          }
+        } else {
+          targetPos = (task as any).getTargetPosition?.() || { x: 0, y: 0 };
+        }
 
         // Render environment
-        environmentRenderer.renderEnvironment(envConfig, targetPos);
+        environmentRenderer.renderEnvironment(envConfig, targetPos, taskType, runningDirection, creatureCenter);
 
         // Get creature state
         const state = gameCore.physicsWorld.getCreatureState(creaturePhysics);
@@ -667,10 +694,10 @@ const TrainingView = forwardRef<TrainingViewRef, TrainingViewProps>(
           <p>Status: {isRunning ? 'Running' : 'Not Started'}</p>
           {progress && (
             <>
-              <p>
-                Episode: {progress.currentEpisode} /{' '}
-                {progress.totalEpisodes || '∞'}
-              </p>
+            <p>
+              Episode: {progress.currentEpisode} /{' '}
+              {progress.totalEpisodes || '∞'}
+            </p>
               <p>
                 Experiences: {progress.totalExperiences.toLocaleString()}
               </p>

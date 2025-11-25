@@ -18,13 +18,13 @@ export class GameConstants {
   static readonly STORAGE_WARNING_THRESHOLD = 0.8; // 80% capacity
 
   // Environment
-  static readonly DEFAULT_ENVIRONMENT_WIDTH = 20; // meters
-  static readonly DEFAULT_ENVIRONMENT_HEIGHT = 15; // meters (increased to match physics test)
+  static readonly DEFAULT_ENVIRONMENT_WIDTH = 50; // meters
+  static readonly DEFAULT_ENVIRONMENT_HEIGHT = 30; // meters
   static readonly DEFAULT_GROUND_LEVEL = 0; // meters
   
   // Viewport
-  static readonly DEFAULT_VIEWPORT_WIDTH = 20; // meters (for game/training view)
-  static readonly DEFAULT_VIEWPORT_HEIGHT = 15; // meters (for game/training view)
+  static readonly DEFAULT_VIEWPORT_WIDTH = 50; // meters (for game/training view)
+  static readonly DEFAULT_VIEWPORT_HEIGHT = 30; // meters (for game/training view)
   
   // Editor viewport (creature creation window)
   static readonly EDITOR_VIEWPORT_WIDTH = 6; // meters
@@ -81,9 +81,16 @@ export class GameConstants {
   static readonly DEFAULT_TASK_DESCRIPTION = 'Navigate to the target waypoint on a flat 2D plane';
   static readonly DEFAULT_TASK_TYPE = 'reach_target' as const;
   
+  // Running task defaults
+  static readonly DEFAULT_RUNNING_TASK_ID = 'running_task';
+  static readonly DEFAULT_RUNNING_TASK_NAME = 'Running';
+  static readonly DEFAULT_RUNNING_REWARD_FACTOR = 0.1; // Reward per unit distance moved in direction
+  // static readonly DEFAULT_RUNNING_TIME_PENALTY = 0.01; // Optional time penalty
+  static readonly DEFAULT_RUNNING_TIME_PENALTY = 0.0; // Optional time penalty
+  
   // Task position defaults
-  static readonly DEFAULT_TARGET_POSITION: Position = { x: 15, y: 1 }; // Center horizontally, 5m above ground
-  static readonly DEFAULT_START_POSITION: Position = { x: 5, y: 2 }; // Center horizontally, 5m above ground
+  static readonly DEFAULT_TARGET_POSITION: Position = { x: 35, y: 1 }; // Center horizontally, 5m above ground
+  static readonly DEFAULT_START_POSITION: Position = { x: 25, y: 2 }; // Center horizontally, 5m above ground
   
   // Task testing defaults
   static readonly DEFAULT_TEST_MAX_STEPS = 1000;
@@ -95,7 +102,8 @@ export class GameConstants {
   static readonly RL_LAMBDA = 0.95; // GAE lambda
   static readonly RL_CLIP_EPSILON = 0.2; // PPO clip ratio
   static readonly RL_VALUE_COEFF = 0.5; // Value loss coefficient
-  static readonly RL_ENTROPY_COEFF = 0.003; // Entropy coefficient
+  // static readonly RL_ENTROPY_COEFF = 0.003; // Entropy coefficient
+  static readonly RL_ENTROPY_COEFF = 0.0; // Entropy coefficient
   static readonly RL_MAX_GRAD_NORM = 0.5; // Gradient clipping
   static readonly RL_EPOCHS = 4; // Training epochs per update
   static readonly RL_MINI_BATCH_SIZE = 128; // Mini-batch size for PPO training
@@ -106,7 +114,8 @@ export class GameConstants {
   static readonly RL_PARALLEL_GAMES = 1; // Number of parallel rollouts
 
   // RL Network architecture
-  static readonly RL_HIDDEN_LAYERS = [64, 32]; // Policy and value network hidden layers
+  // static readonly RL_HIDDEN_LAYERS = [64, 32]; // Policy and value network hidden layers
+  static readonly RL_HIDDEN_LAYERS = [10]; // Policy and value network hidden layers
   static readonly RL_ACTIVATION = 'relu'; // Activation function
   static readonly RL_INITIAL_LOG_STD = 0.0; // Initial log standard deviation for continuous actions (std = exp(0) = 1.0)
 
