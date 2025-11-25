@@ -5,6 +5,7 @@ import TrainingPage from './pages/TrainingPage';
 import TestPage from './pages/TestPage';
 import PhysicsTestPage from './pages/PhysicsTestPage';
 import CreatureDebugPage from './pages/CreatureDebugPage';
+import AquariumPage from './pages/AquariumPage';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/test" element={<TestPage />} />
         <Route path="/physics-test" element={<PhysicsTestPage />} />
         <Route path="/creature-debug" element={<CreatureDebugPage />} />
+        <Route path="/aquarium" element={<AquariumPage />} />
       </Routes>
     </BrowserRouter>
   );

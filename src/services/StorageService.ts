@@ -7,12 +7,13 @@ import type { StorageUsage } from '../utils/types';
 import { GameConstants } from '../utils/constants';
 
 const DB_NAME = 'critterl_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Object stores
 const STORE_TRAINED_MODELS = 'trained_models';
 const STORE_TRAINING_SESSIONS = 'training_sessions';
 const STORE_PERFORMANCE_METRICS = 'performance_metrics';
+const STORE_AQUARIUM_STATE = 'aquarium_state';
 
 export class StorageService {
   private db: IDBDatabase | null = null;
@@ -50,6 +51,10 @@ export class StorageService {
             keyPath: 'modelId',
           });
           metricsStore.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+
+        if (!db.objectStoreNames.contains(STORE_AQUARIUM_STATE)) {
+          db.createObjectStore(STORE_AQUARIUM_STATE, { keyPath: 'id' });
         }
       };
     });
@@ -298,5 +303,6 @@ export const STORES = {
   TRAINED_MODELS: STORE_TRAINED_MODELS,
   TRAINING_SESSIONS: STORE_TRAINING_SESSIONS,
   PERFORMANCE_METRICS: STORE_PERFORMANCE_METRICS,
+  AQUARIUM_STATE: STORE_AQUARIUM_STATE,
 };
 

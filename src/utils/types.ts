@@ -223,3 +223,19 @@ export interface TaskResult {
   timestamp: Date;
 }
 
+// Aquarium types
+export interface AquariumCreature {
+  id: string; // Unique ID for this aquarium instance
+  creatureDesignId: string; // Reference to creature design
+  modelId: string | null; // Reference to trained model (null = no brain, random actions)
+  position: Position; // Initial spawn position
+  direction: { x: number; y: number }; // Current running direction (unit vector)
+  lastDirectionChange: number; // Timestamp of last direction change (ms)
+}
+
+export interface AquariumState {
+  creatures: AquariumCreature[];
+  environment: EnvironmentConfig; // Aquarium environment config
+  lastUpdated: Date;
+}
+

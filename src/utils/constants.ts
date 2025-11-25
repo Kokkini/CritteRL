@@ -124,5 +124,18 @@ export class GameConstants {
   static readonly RL_ROLLOUT_DELTA_TIME = 1 / 32; // Physics timestep (60 FPS)
   static readonly RL_ROLLOUT_ACTION_INTERVAL = 1 / 16; // Action interval in seconds
   static readonly RL_ROLLOUT_YIELD_INTERVAL = 20; // Yield every N steps for UI responsiveness
+
+  // Aquarium defaults
+  static readonly AQUARIUM_ENVIRONMENT_WIDTH = 50; // meters
+  static readonly AQUARIUM_ENVIRONMENT_HEIGHT = 30; // meters
+  static readonly AQUARIUM_DIRECTION_CHANGE_INTERVAL = 10000; // 10 seconds (ms)
+  static readonly AQUARIUM_MAX_CREATURES = 100; // Maximum creatures in aquarium
+  static readonly AQUARIUM_DEFAULT_COUNT = 1; // Default number of instances to add
+  
+  // Aquarium spawn area (creatures spawn randomly within this box)
+  static readonly AQUARIUM_SPAWN_MIN_X = 5; // meters (minimum X position)
+  static readonly AQUARIUM_SPAWN_MAX_X = 45; // meters (maximum X position)
+  static readonly AQUARIUM_SPAWN_MIN_Y = 2; // meters (minimum Y position above ground)
+  static readonly AQUARIUM_SPAWN_MAX_Y = 8; // meters (maximum Y position above ground)
 }
 

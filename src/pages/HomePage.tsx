@@ -6,7 +6,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreatureService } from '../services/CreatureService';
 import { StorageService } from '../services/StorageService';
+import { AquariumService } from '../services/AquariumService';
 import { CreatureDesign } from '../utils/types';
+import AquariumCreatureSelector from '../components/Aquarium/AquariumCreatureSelector';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -49,6 +51,30 @@ export default function HomePage() {
     navigate(`/test?creatureId=${id}`);
   };
 
+  const handleAddToAquarium = async (creatureDesignId: string, modelId: string | null, count: number) => {
+    try {
+      const storageService = new StorageService();
+      await storageService.initialize();
+      const aquariumService = new AquariumService(storageService);
+      await aquariumService.addCreatureToAquarium(creatureDesignId, modelId, count);
+    } catch (error) {
+      console.error('Failed to add to aquarium:', error);
+      throw error;
+    }
+  };
+
+  const handleRemoveFromAquarium = async (creatureDesignId: string, modelId: string | null) => {
+    try {
+      const storageService = new StorageService();
+      await storageService.initialize();
+      const aquariumService = new AquariumService(storageService);
+      await aquariumService.removeCreaturesFromAquarium(creatureDesignId, modelId);
+    } catch (error) {
+      console.error('Failed to remove from aquarium:', error);
+      throw error;
+    }
+  };
+
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <h1>CritteRL</h1>
@@ -57,6 +83,12 @@ export default function HomePage() {
       <div style={{ marginBottom: '20px' }}>
         <button onClick={handleCreateNew} style={{ padding: '10px 20px', fontSize: '16px', marginRight: '10px' }}>
           Create New Creature
+        </button>
+        <button 
+          onClick={() => navigate('/aquarium')} 
+          style={{ padding: '10px 20px', fontSize: '16px', backgroundColor: '#00BCD4', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '10px' }}
+        >
+          View Aquarium
         </button>
         <button 
           onClick={() => navigate('/physics-test')} 
@@ -148,6 +180,11 @@ export default function HomePage() {
                   </button>
                 </div>
               </div>
+              <AquariumCreatureSelector
+                creatureDesignId={creature.id}
+                onAddToAquarium={handleAddToAquarium}
+                onRemoveFromAquarium={handleRemoveFromAquarium}
+              />
             </li>
           ))}
         </ul>
