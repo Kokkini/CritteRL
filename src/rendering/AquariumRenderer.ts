@@ -40,7 +40,8 @@ export class AquariumRenderer {
     const env = aquariumState.environment;
     // No target for aquarium, but we need a dummy position for renderEnvironment
     const dummyTarget = { x: 0, y: 0 };
-    this.environmentRenderer.renderEnvironment(env, dummyTarget, 'running');
+    // Do not show numeric axis labels in aquarium view
+    this.environmentRenderer.renderEnvironment(env, dummyTarget, 'running', undefined, undefined, false);
 
     // Render each creature
     for (const [id, instance] of creatureInstances) {
@@ -55,23 +56,6 @@ export class AquariumRenderer {
         // Get creature state
         const state = gameCore.physicsWorld.getCreatureState(creaturePhysics);
         const creature = new Creature(instance.creatureDesign);
-
-        // Get running direction for visualization
-        const aquariumEnv = gameCore.taskEnvironment as any;
-        const runningDirection = aquariumEnv.getRunningDirection?.() || { x: 1, y: 0 };
-        
-        // Calculate creature center for direction arrow
-        const jointPositions = creaturePhysics.getJointPositions();
-        if (jointPositions.length > 0) {
-          const sum = jointPositions.reduce((acc, pos) => ({ x: acc.x + pos.x, y: acc.y + pos.y }), { x: 0, y: 0 });
-          const creatureCenter = { x: sum.x / jointPositions.length, y: sum.y / jointPositions.length };
-          
-          // Render direction arrow (pass viewport and ctx)
-          const viewport = this.canvasRenderer.getViewport();
-          if (viewport) {
-            this.environmentRenderer.renderRunningDirection(runningDirection, creatureCenter, viewport, ctx);
-          }
-        }
 
         // Render creature (no actions passed - will use default coloring)
         this.creatureRenderer.render(creature, creaturePhysics, state);

@@ -20,24 +20,24 @@ export class EnvironmentRenderer {
     target: Position,
     taskType?: 'reach_target' | 'running',
     runningDirection?: { x: number; y: number },
-    creatureCenter?: Position
+    creatureCenter?: Position,
+    showAxisLabels: boolean = true
   ): void {
     // Render grid first (background)
-    this.renderGrid(environment.width, environment.height, environment.groundLevel);
+    this.renderGrid(environment.width, environment.height, environment.groundLevel, showAxisLabels);
     // Then render other elements
     this.renderGround(environment.groundLevel, environment.width);
     // Walls removed - not rendering walls
     
     // Render task-specific elements
-    if (taskType === 'running' && runningDirection) {
-      // Don't render target for running task
-      // Render running direction arrow
-      if (creatureCenter) {
+    if (taskType === 'running') {
+      // Running task: never render a target, only optional direction arrow
+      if (runningDirection && creatureCenter) {
         this.renderRunningDirection(runningDirection, creatureCenter);
       }
     } else {
-      // Render target for reach_target task
-    this.renderTarget(target, 0.5); // 0.5 meter radius
+      // Non-running tasks: render target
+      this.renderTarget(target, 0.5); // 0.5 meter radius
     }
     
     this.renderBoundaries(environment.width, environment.height);
@@ -48,8 +48,9 @@ export class EnvironmentRenderer {
    * @param width - Environment width in meters
    * @param height - Environment height in meters
    * @param groundLevel - Y position of ground level in meters
+   * @param showAxisLabels - Whether to draw numeric axis labels
    */
-  renderGrid(width: number, height: number, groundLevel: number): void {
+  renderGrid(width: number, height: number, groundLevel: number, showAxisLabels: boolean = true): void {
     const ctx = this.renderer.getContext();
     const viewport = this.renderer.getViewport();
     
@@ -94,55 +95,57 @@ export class EnvironmentRenderer {
 
     ctx.setLineDash([]); // Reset line dash
 
-    // Draw number markers along axes
-    const canvasWidth = this.renderer.width;
-    const canvasHeight = this.renderer.height;
-    
-    ctx.fillStyle = '#FFFFFF'; // White text for better visibility
-    ctx.strokeStyle = '#000000'; // Black outline
-    ctx.lineWidth = 2;
-    ctx.font = 'bold 11px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // X-axis markers (along bottom, at ground level)
-    for (let x = 0; x <= width; x += 1.0) {
-      const screenX = viewport.worldToScreenX(x);
-      const screenY = viewport.worldToScreenY(groundLevel);
+    if (showAxisLabels) {
+      // Draw number markers along axes
+      const canvasWidth = this.renderer.width;
+      const canvasHeight = this.renderer.height;
       
-      // Only draw if within canvas bounds
-      if (screenX >= 0 && screenX <= canvasWidth) {
-        // Draw number slightly below ground line, but ensure it's within canvas
-        const textY = Math.min(screenY + 15, canvasHeight - 5);
-        const text = Math.round(x).toString();
-        
-        // Draw text with outline for visibility
-        ctx.strokeText(text, screenX, textY);
-        ctx.fillText(text, screenX, textY);
-      }
-    }
+      ctx.fillStyle = '#FFFFFF'; // White text for better visibility
+      ctx.strokeStyle = '#000000'; // Black outline
+      ctx.lineWidth = 2;
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
 
-    // Y-axis markers (along left edge)
-    ctx.textAlign = 'right';
-    for (let y = groundLevel; y <= groundLevel + height; y += 1.0) {
-      const screenX = viewport.worldToScreenX(0);
-      const screenY = viewport.worldToScreenY(y);
-      
-      // Only draw if within canvas bounds
-      if (screenY >= 0 && screenY <= canvasHeight) {
-        // Draw number slightly to the left of the left edge, but ensure it's within canvas
-        const textX = Math.max(screenX - 10, 30); // At least 30px from left edge
-        const text = Math.round(y).toString();
+      // X-axis markers (along bottom, at ground level)
+      for (let x = 0; x <= width; x += 1.0) {
+        const screenX = viewport.worldToScreenX(x);
+        const screenY = viewport.worldToScreenY(groundLevel);
         
-        // Draw text with outline for visibility
-        ctx.strokeText(text, textX, screenY);
-        ctx.fillText(text, textX, screenY);
+        // Only draw if within canvas bounds
+        if (screenX >= 0 && screenX <= canvasWidth) {
+          // Draw number slightly below ground line, but ensure it's within canvas
+          const textY = Math.min(screenY + 15, canvasHeight - 5);
+          const text = Math.round(x).toString();
+          
+          // Draw text with outline for visibility
+          ctx.strokeText(text, screenX, textY);
+          ctx.fillText(text, screenX, textY);
+        }
       }
-    }
 
-    // Reset text alignment
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
+      // Y-axis markers (along left edge)
+      ctx.textAlign = 'right';
+      for (let y = groundLevel; y <= groundLevel + height; y += 1.0) {
+        const screenX = viewport.worldToScreenX(0);
+        const screenY = viewport.worldToScreenY(y);
+        
+        // Only draw if within canvas bounds
+        if (screenY >= 0 && screenY <= canvasHeight) {
+          // Draw number slightly to the left of the left edge, but ensure it's within canvas
+          const textX = Math.max(screenX - 10, 30); // At least 30px from left edge
+          const text = Math.round(y).toString();
+          
+          // Draw text with outline for visibility
+          ctx.strokeText(text, textX, screenY);
+          ctx.fillText(text, textX, screenY);
+        }
+      }
+
+      // Reset text alignment
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    }
   }
 
   /**
@@ -371,7 +374,6 @@ export class EnvironmentRenderer {
 
     // Convert world coordinates to screen coordinates
     const centerScreenX = viewport.worldToScreenX(centerPosition.x);
-    const centerScreenY = viewport.worldToScreenY(centerPosition.y);
 
     // Arrow parameters
     const arrowLength = 2.0; // 2 meters in world units

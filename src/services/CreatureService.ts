@@ -2,7 +2,6 @@
  * CreatureService - Manages creature design CRUD operations
  */
 
-import { nanoid } from 'nanoid';
 import {
   CreatureDesign,
   ValidationResult,
@@ -16,6 +15,7 @@ import {
   StorageUnavailableError,
 } from './StorageService';
 import { GameConstants } from '../utils/constants';
+import { generateRandomName } from '../utils/nameGenerator';
 
 const STORAGE_KEY_PREFIX = 'creature_design_';
 
@@ -30,7 +30,7 @@ export class CreatureService {
    * Create a new creature design
    */
   async createCreature(name?: string): Promise<CreatureDesign> {
-    return new CreatureDesignImpl(name || 'Untitled Creature');
+    return new CreatureDesignImpl(name || generateRandomName());
   }
 
   /**

@@ -15,6 +15,7 @@ import { nanoid } from 'nanoid';
 import { ValidationResult } from '../../utils/types';
 import { Viewport } from '../../rendering/Viewport';
 import { GameConstants } from '../../utils/constants';
+import { generateRandomName } from '../../utils/nameGenerator';
 
 export interface CreatureEditorProps {
   initialCreatureId?: string;
@@ -33,7 +34,7 @@ const CreatureEditor = forwardRef<CreatureEditorRef, CreatureEditorProps>(
     const navigate = useNavigate();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [creature, setCreature] = useState<CreatureDesignImpl>(
-      new CreatureDesignImpl('New Creature')
+      new CreatureDesignImpl(generateRandomName())
     );
     // Store joint positions (joints placed as circles before bones are created)
     // Map: jointId -> position
