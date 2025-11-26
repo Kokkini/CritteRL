@@ -14,6 +14,8 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [creatures, setCreatures] = useState<CreatureDesign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState<string>('');
 
   useEffect(() => {
     const loadCreatures = async () => {
@@ -75,6 +77,44 @@ export default function HomePage() {
     }
   };
 
+  const handleStartEditName = (creature: CreatureDesign, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingNameId(creature.id);
+    setEditingName(creature.name || '');
+  };
+
+  const handleSaveName = async (creatureId: string) => {
+    try {
+      const storageService = new StorageService();
+      await storageService.initialize();
+      const creatureService = new CreatureService(storageService);
+      
+      // Load the creature, update name, and save
+      const creature = await creatureService.loadCreature(creatureId);
+      if (!creature) {
+        alert('Creature not found');
+        return;
+      }
+      
+      creature.name = editingName.trim() || 'Unnamed Creature';
+      creature.updatedAt = new Date();
+      await creatureService.saveCreature(creature);
+      
+      // Update local state
+      setCreatures(creatures.map(c => c.id === creatureId ? creature : c));
+      setEditingNameId(null);
+      setEditingName('');
+    } catch (error) {
+      console.error('Failed to save name:', error);
+      alert('Failed to save name: ' + (error instanceof Error ? error.message : String(error)));
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setEditingNameId(null);
+    setEditingName('');
+  };
+
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <h1>CritteRL</h1>
@@ -124,7 +164,87 @@ export default function HomePage() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                 <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => handleLoadCreature(creature.id)}>
-                  <strong style={{ fontSize: '18px' }}>{creature.name || 'Unnamed Creature'}</strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {editingNameId === creature.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleSaveName(creature.id);
+                            } else if (e.key === 'Escape') {
+                              handleCancelEditName();
+                            }
+                          }}
+                          onBlur={() => handleSaveName(creature.id)}
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            fontSize: '18px',
+                            fontWeight: 'bold',
+                            padding: '4px 8px',
+                            border: '1px solid #2196F3',
+                            borderRadius: '4px',
+                            flex: 1,
+                          }}
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSaveName(creature.id);
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCancelEditName();
+                          }}
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            backgroundColor: '#f44336',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <strong style={{ fontSize: '18px' }}>{creature.name || 'Unnamed Creature'}</strong>
+                        <span
+                          onClick={(e) => handleStartEditName(creature, e)}
+                          style={{
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            color: '#666',
+                            padding: '4px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                          }}
+                          title="Edit name"
+                        >
+                          🖋️
+                        </span>
+                      </>
+                    )}
+                  </div>
                   <br />
                   <small style={{ color: '#666' }}>
                     {creature.bones.length} bones, {creature.joints.length} joints,{' '}
