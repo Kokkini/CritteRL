@@ -97,7 +97,7 @@ export class GameConstants {
   static readonly DEFAULT_TEST_TIMESTEP = 1 / 60; // 60 FPS
 
   // RL Training hyperparameters
-  static readonly RL_LEARNING_RATE = 0.0005;
+  static readonly RL_LEARNING_RATE = 0.005;
   static readonly RL_GAMMA = 0.99; // Discount factor
   static readonly RL_LAMBDA = 0.95; // GAE lambda
   static readonly RL_CLIP_EPSILON = 0.2; // PPO clip ratio
