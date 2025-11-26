@@ -137,5 +137,11 @@ export class GameConstants {
   static readonly AQUARIUM_SPAWN_MAX_X = 45; // meters (maximum X position)
   static readonly AQUARIUM_SPAWN_MIN_Y = 2; // meters (minimum Y position above ground)
   static readonly AQUARIUM_SPAWN_MAX_Y = 8; // meters (maximum Y position above ground)
+
+  // Aquarium food balls
+  static readonly AQUARIUM_FOOD_RADIUS = 0.3; // meters
+  static readonly AQUARIUM_FOOD_DRAG_LINEAR = 1.0;
+  static readonly AQUARIUM_FOOD_EAT_RADIUS = 0.5; // meters
+  static readonly AQUARIUM_FOOD_MAX_COUNT = 20;
 }
 

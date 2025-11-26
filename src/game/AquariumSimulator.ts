@@ -3,7 +3,7 @@
  */
 
 import { nanoid } from 'nanoid';
-import { AquariumState, AquariumCreature, CreatureDesign, TrainedModel, Position, RewardFunctionConfig } from '../utils/types';
+import { AquariumState, AquariumCreature, CreatureDesign, TrainedModel, Position, RewardFunctionConfig, FoodBall } from '../utils/types';
 import { CreatureGameCore } from './CreatureGameCore';
 import { AquariumRunningTaskEnvironment } from './AquariumRunningTaskEnvironment';
 import { RunningRewardCalculator } from './RunningRewardCalculator';
@@ -31,6 +31,7 @@ export class AquariumSimulator {
   private creatureService: CreatureService;
   private trainingService: TrainingService;
   private directionChangeInterval: number = GameConstants.AQUARIUM_DIRECTION_CHANGE_INTERVAL;
+  private foodBalls: FoodBall[] = [];
 
   constructor(
     aquariumState: AquariumState,
@@ -48,6 +49,8 @@ export class AquariumSimulator {
   async initialize(): Promise<void> {
     // Clear existing instances
     this.destroy();
+    // Clear any existing food balls (session-only by default)
+    this.foodBalls = [];
 
     // Load all creatures and create game cores
     for (const aquariumCreature of this.aquariumState.creatures) {
@@ -186,7 +189,10 @@ export class AquariumSimulator {
   step(deltaTime: number): void {
     const now = Date.now();
 
-    // Update directions if needed
+    // Update food ball motion (simple vertical physics with drag)
+    this.updateFoodBalls(deltaTime);
+
+    // Update directions (toward food if present, otherwise random)
     this.updateDirections(now);
 
     // Step each creature
@@ -207,6 +213,9 @@ export class AquariumSimulator {
         console.error(`[AquariumSimulator] Error stepping creature ${id}:`, error);
       }
     }
+
+    // After stepping, check for food consumption
+    this.handleFoodConsumption();
   }
 
   /**
@@ -242,27 +251,186 @@ export class AquariumSimulator {
   }
 
   /**
-   * Update directions for creatures that need direction changes
+   * Update food ball positions using simple gravity and drag.
+   */
+  private updateFoodBalls(deltaTime: number): void {
+    if (this.foodBalls.length === 0) return;
+
+    const gravityY = GameConstants.DEFAULT_GRAVITY.y; // Negative = down
+    const drag = GameConstants.AQUARIUM_FOOD_DRAG_LINEAR;
+    const groundLevel = this.aquariumState.environment.groundLevel;
+
+    for (const food of this.foodBalls) {
+      // Integrate velocity
+      food.velocity.y += gravityY * deltaTime;
+      // Apply simple linear drag
+      food.velocity.y *= 1 - Math.min(drag * deltaTime, 0.9);
+
+      // Integrate position
+      food.position.y += food.velocity.y * deltaTime;
+
+      // Prevent going below ground
+      const minY = groundLevel + food.radius;
+      if (food.position.y < minY) {
+        food.position.y = minY;
+        food.velocity.y = 0;
+      }
+    }
+  }
+
+  /**
+   * Update running direction for each creature.
+   * - If there are food balls, point toward the nearest one horizontally.
+   * - If no food balls, fall back to periodic random direction changes.
    */
   private updateDirections(now: number): void {
-    for (const [id, instance] of this.creatureInstances) {
+    // If there are food balls, steer creatures toward the nearest one in X
+    if (this.foodBalls.length > 0) {
+      for (const [, instance] of this.creatureInstances) {
+        const gameCore = instance.gameCore;
+        const creaturePhysics = gameCore.creaturePhysics;
+        if (!creaturePhysics) {
+          continue;
+        }
+
+        const jointPositions = creaturePhysics.getJointPositions();
+        if (jointPositions.length === 0) {
+          continue;
+        }
+
+        // Compute center of mass (mean joint position)
+        let sumX = 0;
+        let sumY = 0;
+        for (const p of jointPositions) {
+          sumX += p.x;
+          sumY += p.y;
+        }
+        const centerX = sumX / jointPositions.length;
+        const centerY = sumY / jointPositions.length;
+
+        // Find nearest food ball in Euclidean distance
+        let nearest: FoodBall | null = null;
+        let nearestDistSq = Number.POSITIVE_INFINITY;
+        for (const food of this.foodBalls) {
+          const dx = food.position.x - centerX;
+          const dy = food.position.y - centerY;
+          const distSq = dx * dx + dy * dy;
+          if (distSq < nearestDistSq) {
+            nearestDistSq = distSq;
+            nearest = food;
+          }
+        }
+
+        if (nearest) {
+          const directionX = nearest.position.x >= centerX ? 1 : -1;
+          const newDirection = { x: directionX, y: 0 };
+
+          // Update in aquarium creature and environment
+          instance.aquariumCreature.direction = newDirection;
+          instance.aquariumCreature.lastDirectionChange = now;
+          const aquariumEnv = gameCore.taskEnvironment as AquariumRunningTaskEnvironment;
+          aquariumEnv.setDirection(newDirection);
+        }
+      }
+      return;
+    }
+
+    // No food: use periodic random direction changes
+    for (const [, instance] of this.creatureInstances) {
       const aquariumCreature = instance.aquariumCreature;
       const timeSinceLastChange = now - aquariumCreature.lastDirectionChange;
 
       if (timeSinceLastChange >= this.directionChangeInterval) {
-        // Randomly choose new direction: (1, 0) or (-1, 0)
         const directionX = Math.random() < 0.5 ? 1 : -1;
         const newDirection = { x: directionX, y: 0 };
 
-        // Update in aquarium creature
         aquariumCreature.direction = newDirection;
         aquariumCreature.lastDirectionChange = now;
 
-        // Update in game core environment
         const aquariumEnv = instance.gameCore.taskEnvironment as AquariumRunningTaskEnvironment;
         aquariumEnv.setDirection(newDirection);
       }
     }
+  }
+
+  /**
+   * Handle consumption of food balls by creatures.
+   * The first creature whose center comes within AQUARIUM_FOOD_EAT_RADIUS
+   * of a food ball will consume it.
+   */
+  private handleFoodConsumption(): void {
+    if (this.foodBalls.length === 0) {
+      return;
+    }
+
+    const eatenIds = new Set<string>();
+    const eatRadiusSq = GameConstants.AQUARIUM_FOOD_EAT_RADIUS * GameConstants.AQUARIUM_FOOD_EAT_RADIUS;
+
+    for (const [, instance] of this.creatureInstances) {
+      const gameCore = instance.gameCore;
+      const creaturePhysics = gameCore.creaturePhysics;
+      if (!creaturePhysics) {
+        continue;
+      }
+
+      const jointPositions = creaturePhysics.getJointPositions();
+      if (jointPositions.length === 0) {
+        continue;
+      }
+
+      let sumX = 0;
+      let sumY = 0;
+      for (const p of jointPositions) {
+        sumX += p.x;
+        sumY += p.y;
+      }
+      const centerX = sumX / jointPositions.length;
+      const centerY = sumY / jointPositions.length;
+
+      for (const food of this.foodBalls) {
+        if (eatenIds.has(food.id)) {
+          continue;
+        }
+        const dx = food.position.x - centerX;
+        const dy = food.position.y - centerY;
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= eatRadiusSq) {
+          eatenIds.add(food.id);
+          // Increment this creature's food count
+          instance.aquariumCreature.foodEaten = (instance.aquariumCreature.foodEaten || 0) + 1;
+          // This creature eats the food; move to next creature
+          break;
+        }
+      }
+    }
+
+    if (eatenIds.size > 0) {
+      this.foodBalls = this.foodBalls.filter((f) => !eatenIds.has(f.id));
+    }
+  }
+
+  /**
+   * Add a new food ball at the given world position.
+   */
+  addFoodBall(position: Position, radius: number = GameConstants.AQUARIUM_FOOD_RADIUS): void {
+    if (this.foodBalls.length >= GameConstants.AQUARIUM_FOOD_MAX_COUNT) {
+      // Remove oldest to keep count under limit
+      this.foodBalls.shift();
+    }
+    const food: FoodBall = {
+      id: nanoid(),
+      position: { x: position.x, y: position.y },
+      radius,
+      velocity: { x: 0, y: 0 },
+    };
+    this.foodBalls.push(food);
+  }
+
+  /**
+   * Get current food balls for rendering.
+   */
+  getFoodBalls(): FoodBall[] {
+    return this.foodBalls;
   }
 
   /**

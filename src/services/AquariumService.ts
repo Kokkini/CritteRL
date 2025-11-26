@@ -109,6 +109,7 @@ export class AquariumService {
         position: { x, y },
         direction,
         lastDirectionChange: Date.now(),
+        foodEaten: 0,
       };
 
       state.creatures.push(aquariumCreature);

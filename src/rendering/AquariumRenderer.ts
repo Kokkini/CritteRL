@@ -5,7 +5,7 @@
 import { CanvasRenderer } from './CanvasRenderer';
 import { CreatureRenderer } from './CreatureRenderer';
 import { EnvironmentRenderer } from './EnvironmentRenderer';
-import { AquariumState } from '../utils/types';
+import { AquariumState, AquariumCreature, FoodBall, Position } from '../utils/types';
 import { CreaturePhysics } from '../physics/CreaturePhysics';
 import { CreatureState } from '../utils/types';
 import { Creature } from '../game/Creature';
@@ -26,10 +26,15 @@ export class AquariumRenderer {
    */
   renderAquarium(
     aquariumState: AquariumState,
-    creatureInstances: Map<string, {
-      gameCore: any;
-      creatureDesign: any;
-    }>
+    creatureInstances: Map<
+      string,
+      {
+        gameCore: any;
+        creatureDesign: any;
+        aquariumCreature: AquariumCreature;
+      }
+    >,
+    foodBalls: FoodBall[] = []
   ): void {
     const ctx = this.canvasRenderer.getContext();
     
@@ -42,6 +47,11 @@ export class AquariumRenderer {
     const dummyTarget = { x: 0, y: 0 };
     // Do not show numeric axis labels in aquarium view
     this.environmentRenderer.renderEnvironment(env, dummyTarget, 'running', undefined, undefined, false);
+
+    // Render food balls (if any)
+    if (foodBalls.length > 0) {
+      this.environmentRenderer.renderFoodBalls(foodBalls);
+    }
 
     // Render each creature
     for (const [id, instance] of creatureInstances) {
@@ -59,10 +69,50 @@ export class AquariumRenderer {
 
         // Render creature (no actions passed - will use default coloring)
         this.creatureRenderer.render(creature, creaturePhysics, state);
+
+        // Render food-eaten count near creature
+        const jointPositions = creaturePhysics.getJointPositions();
+        if (jointPositions.length > 0) {
+          const center = this.computeCenter(jointPositions);
+          this.renderFoodEatenLabel(center, instance.aquariumCreature.foodEaten || 0);
+        }
       } catch (error) {
         console.error(`[AquariumRenderer] Error rendering creature ${id}:`, error);
       }
     }
+  }
+
+  private computeCenter(positions: Position[]): Position {
+    let sumX = 0;
+    let sumY = 0;
+    for (const p of positions) {
+      sumX += p.x;
+      sumY += p.y;
+    }
+    return { x: sumX / positions.length, y: sumY / positions.length };
+  }
+
+  private renderFoodEatenLabel(center: Position, count: number): void {
+    const viewport = this.canvasRenderer.getViewport();
+    if (!viewport) return;
+
+    const ctx = this.canvasRenderer.getContext();
+    const screenX = viewport.worldToScreenX(center.x);
+    const screenY = viewport.worldToScreenY(center.y + 2); // a bit above creature center
+
+    const text = `🍎${count}`;
+
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+
+    // Outline for readability
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.strokeText(text, screenX, screenY);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(text, screenX, screenY);
   }
 }
 

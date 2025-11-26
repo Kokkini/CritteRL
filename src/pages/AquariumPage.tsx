@@ -62,9 +62,16 @@ export default function AquariumPage() {
           simulatorRef.current.step(deltaTime);
         }
 
-        // Always render (environment + creatures if any)
+        // Always render (environment + creatures and food if any)
         if (aquariumStateRef.current) {
-          aquariumRendererRef.current.renderAquarium(aquariumStateRef.current, creatureInstances);
+          const foodBalls = (simulatorRef.current as any).getFoodBalls
+            ? (simulatorRef.current as any).getFoodBalls()
+            : [];
+          aquariumRendererRef.current.renderAquarium(
+            aquariumStateRef.current,
+            creatureInstances,
+            foodBalls
+          );
         }
       }
 
@@ -182,6 +189,35 @@ export default function AquariumPage() {
     };
   }, []);
 
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!simulatorRef.current || !canvasRendererRef.current || !aquariumStateRef.current) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    const viewport = canvasRendererRef.current.getViewport();
+    if (!canvas || !viewport) {
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    // Mouse position in CSS pixels relative to the canvas element
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+
+    // Scale CSS pixel coords to the canvas's internal resolution
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const canvasX = cssX * scaleX;
+    const canvasY = cssY * scaleY;
+
+    // Convert to world coordinates using the viewport
+    const worldX = viewport.screenToWorldX(canvasX);
+    const worldY = viewport.screenToWorldY(canvasY);
+
+    (simulatorRef.current as any).addFoodBall({ x: worldX, y: worldY });
+  };
+
   const handleClearAquarium = async () => {
     if (!window.confirm('Clear all creatures from aquarium?')) {
       return;
@@ -269,6 +305,7 @@ export default function AquariumPage() {
       <div style={{ width: '100%', maxWidth: '1200px', marginTop: '10px' }}>
         <canvas
           ref={canvasRef}
+          onClick={handleCanvasClick}
           style={{ border: '1px solid #ccc', display: 'block', width: '100%', height: 'auto' }}
         />
       </div>

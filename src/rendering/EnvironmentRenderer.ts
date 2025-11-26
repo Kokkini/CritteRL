@@ -149,6 +149,40 @@ export class EnvironmentRenderer {
   }
 
   /**
+   * Render a single food ball
+   */
+  renderFoodBall(position: Position, radius: number): void {
+    const ctx = this.renderer.getContext();
+    const viewport = this.renderer.getViewport();
+    
+    if (!viewport) {
+      return;
+    }
+
+    const x = viewport.worldToScreenX(position.x);
+    const y = viewport.worldToScreenY(position.y);
+    const r = viewport.worldToScreenDistance(radius);
+
+    ctx.fillStyle = '#FFA726'; // Orange
+    ctx.strokeStyle = '#FB8C00';
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  /**
+   * Render multiple food balls
+   */
+  renderFoodBalls(foodBalls: { position: Position; radius: number }[]): void {
+    for (const food of foodBalls) {
+      this.renderFoodBall(food.position, food.radius);
+    }
+  }
+
+  /**
    * Render ground plane
    * width and groundLevel are in meters (world units)
    */

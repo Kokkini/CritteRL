@@ -231,6 +231,14 @@ export interface AquariumCreature {
   position: Position; // Initial spawn position
   direction: { x: number; y: number }; // Current running direction (unit vector)
   lastDirectionChange: number; // Timestamp of last direction change (ms)
+  foodEaten: number; // Number of food balls eaten in the aquarium
+}
+
+export interface FoodBall {
+  id: string;
+  position: Position;
+  radius: number;
+  velocity: Position;
 }
 
 export interface AquariumState {
